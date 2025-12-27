@@ -35,14 +35,11 @@ with calendar-based insights, meaningful visuals, and smooth interactions.
 ## 📱 App Screens
 
 <p align="center">
-  <img src="assets/screenshots/dashboard.jpeg" width="220"/>
-  <img src="assets/screenshots/calendar.jpeg" width="220"/>
-  <img src="assets/screenshots/transactiondetail.jpeg" width="220"/>
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/setting.jpeg" width="220"/>
-  <img src="assets/screenshots/analytics.jpeg" width="220"/>
+  <img src="assets/screenshots/dashboard.png" width="220"/>
+  <img src="assets/screenshots/calendar.png" width="220"/>
+  <img src="assets/screenshots/addexpense.png" width="220"/>
+  <img src="assets/screenshots/settings.png" width="220"/>
+  <img src="assets/screenshots/analytics.png" width="220"/>
 </p>
 
 ---
