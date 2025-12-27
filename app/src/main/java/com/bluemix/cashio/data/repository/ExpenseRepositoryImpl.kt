@@ -501,12 +501,13 @@ class ExpenseRepositoryImpl(
         }
     }
 
-    override suspend fun getExpenseById(id: String): Result<Expense?> = withContext(Dispatchers.IO) {
-        resultOf {
-            val entity = realm.query<ExpenseEntity>("id == $0", id).first().find()
-            entity?.let { entityToDomain(it) }
+    override suspend fun getExpenseById(id: String): Result<Expense?> =
+        withContext(Dispatchers.IO) {
+            resultOf {
+                val entity = realm.query<ExpenseEntity>("id == $0", id).first().find()
+                entity?.let { entityToDomain(it) }
+            }
         }
-    }
 
     override suspend fun getExpensesByDateRange(
         startDate: LocalDateTime,
@@ -547,32 +548,34 @@ class ExpenseRepositoryImpl(
         }
     }
 
-    override suspend fun updateExpense(expense: Expense): Result<Unit> = withContext(Dispatchers.IO) {
-        resultOf {
-            realm.write {
-                val existing = query<ExpenseEntity>("id == $0", expense.id).first().find()
-                existing?.apply {
-                    amount = expense.amount
-                    title = expense.title
-                    categoryId = expense.category.id
-                    date = expense.date
-                    note = expense.note
-                    merchantName = expense.merchantName
-                    transactionType = expense.transactionType.name
+    override suspend fun updateExpense(expense: Expense): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            resultOf {
+                realm.write {
+                    val existing = query<ExpenseEntity>("id == $0", expense.id).first().find()
+                    existing?.apply {
+                        amount = expense.amount
+                        title = expense.title
+                        categoryId = expense.category.id
+                        date = expense.date
+                        note = expense.note
+                        merchantName = expense.merchantName
+                        transactionType = expense.transactionType.name
+                    }
+                }
+                Unit
+            }
+        }
+
+    override suspend fun deleteExpense(expenseId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            resultOf {
+                realm.write {
+                    val entity = query<ExpenseEntity>("id == $0", expenseId).first().find()
+                    if (entity != null) delete(entity)
                 }
             }
-            Unit
         }
-    }
-
-    override suspend fun deleteExpense(expenseId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        resultOf {
-            realm.write {
-                val entity = query<ExpenseEntity>("id == $0", expenseId).first().find()
-                if (entity != null) delete(entity)
-            }
-        }
-    }
 
     override suspend fun deleteExpenses(expenseIds: List<String>): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -590,7 +593,8 @@ class ExpenseRepositoryImpl(
         withContext(Dispatchers.IO) {
             resultOf {
                 val (startDate, endDate) = dateRange.getDateBounds()
-                val expenses = (getExpensesByDateRange(startDate, endDate) as? Result.Success)?.data.orEmpty()
+                val expenses =
+                    (getExpensesByDateRange(startDate, endDate) as? Result.Success)?.data.orEmpty()
 
                 if (expenses.isEmpty()) {
                     return@resultOf FinancialStats(
@@ -635,8 +639,10 @@ class ExpenseRepositoryImpl(
         resultOf {
             val parsedTransactions = smsReader.syncTransactions()
 
-            val categories = (categoryRepository.getAllCategories() as? Result.Success)?.data.orEmpty()
-            val keywordMappings = (keywordMappingRepository.getAllKeywordMappings() as? Result.Success)?.data.orEmpty()
+            val categories =
+                (categoryRepository.getAllCategories() as? Result.Success)?.data.orEmpty()
+            val keywordMappings =
+                (keywordMappingRepository.getAllKeywordMappings() as? Result.Success)?.data.orEmpty()
 
             // ✅ Refresh cache after seeding/updates (simple)
             if (categories.isNotEmpty()) {
@@ -664,7 +670,8 @@ class ExpenseRepositoryImpl(
                     if (category != null) {
                         val expense = transaction.toExpense(category)
 
-                        val exists = query<ExpenseEntity>("id == $0", expense.id).first().find() != null
+                        val exists =
+                            query<ExpenseEntity>("id == $0", expense.id).first().find() != null
                         if (!exists) {
                             copyToRealm(expense.toEntity())
                             newCount++
@@ -708,7 +715,8 @@ class ExpenseRepositoryImpl(
 
                 Log.i(TAG, "🔎 Recategorize START | keyword='$kw'")
 
-                val mappings = (keywordMappingRepository.getAllKeywordMappings() as? Result.Success)?.data.orEmpty()
+                val mappings =
+                    (keywordMappingRepository.getAllKeywordMappings() as? Result.Success)?.data.orEmpty()
 
                 fun resolveCategoryId(merchant: String?, title: String?, raw: String?): String {
                     val haystack = listOfNotNull(merchant, title, raw).joinToString(" ").lowercase()
@@ -745,7 +753,10 @@ class ExpenseRepositoryImpl(
                 // ✅ Optional: cache might now be stale if categories changed elsewhere
                 // categoryCache = emptyMap()
 
-                Log.i(TAG, "✅ Recategorize DONE | keyword='$kw' updated=$updatedCount in ${System.currentTimeMillis() - start}ms")
+                Log.i(
+                    TAG,
+                    "✅ Recategorize DONE | keyword='$kw' updated=$updatedCount in ${System.currentTimeMillis() - start}ms"
+                )
                 updatedCount
             }
         }

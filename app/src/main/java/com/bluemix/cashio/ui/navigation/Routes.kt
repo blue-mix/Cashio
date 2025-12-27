@@ -1,4 +1,4 @@
-package com.bluemix.cashio.core.navigation
+package com.bluemix.cashio.ui.navigation
 
 import kotlinx.serialization.Serializable
 
@@ -16,11 +16,11 @@ sealed interface Route {
 
     // Existing (you used "Expenses" for HistoryScreen earlier)
     @Serializable
-    data object Expenses : Route
+    data object History : Route
 
     // Add transaction. Optional expenseId enables edit mode.
     @Serializable
-    data class AddExpense(val expenseId: String?) : Route
+    data class AddExpense(val expenseId: String?=null) : Route
 
     // Details screen for a transaction/expense
     @Serializable
@@ -32,13 +32,18 @@ sealed interface Route {
     @Serializable
     data object Settings : Route
 
-    // later
-    @Serializable
-    data object Spending : Route
-
     @Serializable
     data object Categories : Route
 
     @Serializable
     data object KeywordMapping : Route
+
+    @Serializable
+    data object Splash : Route
+
+    // TODO(nav): enable when Spending screen ships
+//    @Serializable
+//    data object Spending : Route
+
+
 }

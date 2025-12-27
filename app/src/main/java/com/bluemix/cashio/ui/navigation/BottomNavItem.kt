@@ -1,4 +1,4 @@
-package com.bluemix.cashio.core.navigation
+package com.bluemix.cashio.ui.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.vector.ImageVector

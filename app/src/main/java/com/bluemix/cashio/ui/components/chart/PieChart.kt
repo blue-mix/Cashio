@@ -1,4 +1,4 @@
-package com.bluemix.cashio.components
+package com.bluemix.cashio.ui.components.chart
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.theme.CashioSemantic
 import kotlin.math.roundToInt
 

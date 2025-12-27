@@ -21,10 +21,9 @@ import java.util.UUID
 @Immutable
 data class CategoriesState(
     val categories: UiState<List<Category>> = UiState.Idle,
-
-    val editor: CategoryEditorState? = null, // null = no dialog
+    val query: String = "",
+    val editor: CategoryEditorState? = null, // null = closed
     val isDeleting: Boolean = false,
-
     val message: UiMessage? = null
 )
 
@@ -42,10 +41,7 @@ data class CategoryEditorState(
 enum class EditorMode { ADD, EDIT }
 
 @Immutable
-data class UiMessage(
-    val type: UiMessageType,
-    val text: String
-)
+data class UiMessage(val type: UiMessageType, val text: String)
 
 enum class UiMessageType { SUCCESS, ERROR }
 
@@ -73,15 +69,17 @@ class CategoriesViewModel(
                 }
 
                 is Result.Error -> _state.update {
-                    it.copy(
-                        categories = UiState.Error(result.message ?: "Failed to load categories")
-                    )
+                    it.copy(categories = UiState.Error(result.message ?: "Failed to load categories"))
                 }
 
                 else -> Unit
             }
         }
     }
+
+    /* ------------------------- Search ------------------------- */
+
+    fun setQuery(value: String) = _state.update { it.copy(query = value) }
 
     /* ------------------------- Editor ------------------------- */
 
@@ -112,47 +110,44 @@ class CategoriesViewModel(
         }
     }
 
-    fun updateEditorName(value: String) {
-        _state.update { s ->
-            val editor = s.editor ?: return
-            s.copy(editor = editor.copy(name = value, fieldError = null))
-        }
+    fun updateEditorName(value: String) = _state.update { s ->
+        val editor = s.editor ?: return@update s
+        s.copy(editor = editor.copy(name = value, fieldError = null))
     }
 
-    fun updateEditorIcon(value: String) {
-        _state.update { s ->
-            val editor = s.editor ?: return
-            s.copy(editor = editor.copy(icon = value))
-        }
+    fun updateEditorIcon(value: String) = _state.update { s ->
+        val editor = s.editor ?: return@update s
+        s.copy(editor = editor.copy(icon = value))
     }
 
-    fun updateEditorColor(value: Color) {
-        _state.update { s ->
-            val editor = s.editor ?: return
-            s.copy(editor = editor.copy(color = value))
-        }
+    fun updateEditorColor(value: Color) = _state.update { s ->
+        val editor = s.editor ?: return@update s
+        s.copy(editor = editor.copy(color = value))
     }
 
-    fun dismissEditor() {
-        _state.update { it.copy(editor = null) }
-    }
+    fun dismissEditor() = _state.update { it.copy(editor = null) }
 
     fun saveCategory() {
-        val editorSnapshot = _state.value.editor ?: return
-        val name = editorSnapshot.name.trim()
+        val currentEditor = _state.value.editor ?: return
+        if (currentEditor.isSaving) return
 
+        val name = currentEditor.name.trim()
         if (name.isBlank()) {
             _state.update { s ->
-                s.copy(editor = editorSnapshot.copy(fieldError = "Please enter a category name"))
+                val editor = s.editor ?: return@update s
+                s.copy(editor = editor.copy(fieldError = "Please enter a category name"))
             }
             return
         }
 
         viewModelScope.launch {
+            // mark saving using latest editor
             _state.update { s ->
                 val editor = s.editor ?: return@update s
                 s.copy(editor = editor.copy(isSaving = true, fieldError = null))
             }
+
+            val editorSnapshot = _state.value.editor ?: currentEditor
 
             val category = when (editorSnapshot.mode) {
                 EditorMode.ADD -> Category(
@@ -168,7 +163,6 @@ class CategoriesViewModel(
                         ?.data
                         ?.firstOrNull { it.id == editorSnapshot.categoryId }
 
-                    // Fallback if list not loaded yet
                     val base = existing ?: Category(
                         id = editorSnapshot.categoryId ?: "unknown",
                         name = name,
@@ -197,10 +191,7 @@ class CategoriesViewModel(
                             editor = null,
                             message = UiMessage(
                                 type = UiMessageType.SUCCESS,
-                                text = if (editorSnapshot.mode == EditorMode.EDIT)
-                                    "Category updated"
-                                else
-                                    "Category added"
+                                text = if (editorSnapshot.mode == EditorMode.EDIT) "Category updated" else "Category added"
                             )
                         )
                     }
@@ -228,6 +219,8 @@ class CategoriesViewModel(
     /* ------------------------- Delete ------------------------- */
 
     fun deleteCategory(categoryId: String, forceDelete: Boolean = false) {
+        if (_state.value.isDeleting) return
+
         viewModelScope.launch {
             _state.update { it.copy(isDeleting = true) }
 
@@ -247,20 +240,15 @@ class CategoriesViewModel(
                     _state.update {
                         it.copy(
                             isDeleting = false,
-                            message = UiMessage(
-                                UiMessageType.ERROR,
-                                result.message ?: "Failed to delete category"
-                            )
+                            message = UiMessage(UiMessageType.ERROR, result.message ?: "Failed to delete category")
                         )
                     }
                 }
 
-                else -> Unit
+                else -> _state.update { it.copy(isDeleting = false) }
             }
         }
     }
 
-    fun clearMessage() {
-        _state.update { it.copy(message = null) }
-    }
+    fun clearMessage() = _state.update { it.copy(message = null) }
 }

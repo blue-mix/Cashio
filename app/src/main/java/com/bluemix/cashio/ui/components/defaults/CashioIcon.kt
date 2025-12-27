@@ -1,10 +1,11 @@
-package com.bluemix.cashio.components
+package com.bluemix.cashio.ui.components.defaults
 
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
-import androidx.compose.material3.Icon
-import androidx.compose.ui.Modifier
 
 sealed class CashioIcon {
     data class Vector(val imageVector: ImageVector) : CashioIcon()
@@ -15,7 +16,7 @@ sealed class CashioIcon {
 fun CashioIcon(
     icon: CashioIcon,
     modifier: Modifier = Modifier,
-    tint: androidx.compose.ui.graphics.Color? = null,
+    tint: Color? = null,
     contentDescription: String? = null
 ) {
     when (icon) {
@@ -24,15 +25,16 @@ fun CashioIcon(
                 imageVector = icon.imageVector,
                 contentDescription = contentDescription,
                 modifier = modifier,
-                tint = tint ?: androidx.compose.ui.graphics.Color.Unspecified
+                tint = tint ?: Color.Unspecified
             )
         }
+
         is CashioIcon.Drawable -> {
             Icon(
                 painter = painterResource(icon.resId),
                 contentDescription = contentDescription,
                 modifier = modifier,
-                tint = tint ?: androidx.compose.ui.graphics.Color.Unspecified
+                tint = tint ?: Color.Unspecified
             )
         }
     }

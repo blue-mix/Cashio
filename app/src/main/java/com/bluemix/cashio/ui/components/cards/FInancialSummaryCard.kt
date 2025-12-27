@@ -1,5 +1,4 @@
-
-package com.bluemix.cashio.components
+package com.bluemix.cashio.ui.components.cards
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -39,11 +38,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
+import com.bluemix.cashio.ui.components.defaults.CashioCard
+import com.bluemix.cashio.ui.components.defaults.CashioIcon
 import com.bluemix.cashio.ui.theme.CashioSemantic
+import java.util.Locale
 import kotlin.math.abs
 
 /**
@@ -51,7 +54,7 @@ import kotlin.math.abs
  *
  * Notes:
  * - "Delta" values should be positive/negative based on comparison vs previous period.
- * - The row tint stays consistent (Income row uses green, Expense row uses red),
+ * - Row tint stays consistent (Income=green, Expense=red),
  *   while delta color communicates direction (good/bad) based on context.
  */
 @Composable
@@ -61,6 +64,7 @@ fun FinancialSummaryCard(
     incomeDelta: Double,
     expenseDelta: Double,
     currencySymbol: String = "₹",
+    comparisonLabel: String = "last month",
     showChevron: Boolean = true,
     onIncomeClick: () -> Unit = {},
     onExpenseClick: () -> Unit = {},
@@ -74,6 +78,7 @@ fun FinancialSummaryCard(
                 amount = totalIncome,
                 delta = incomeDelta,
                 currencySymbol = currencySymbol,
+                comparisonLabel = comparisonLabel,
                 isIncomeRow = true,
                 showChevron = showChevron,
                 onClick = onIncomeClick
@@ -90,6 +95,7 @@ fun FinancialSummaryCard(
                 amount = totalExpenses,
                 delta = expenseDelta,
                 currencySymbol = currencySymbol,
+                comparisonLabel = comparisonLabel,
                 isIncomeRow = false,
                 showChevron = showChevron,
                 onClick = onExpenseClick
@@ -105,11 +111,13 @@ private fun MetricRow(
     amount: Double,
     delta: Double,
     currencySymbol: String,
+    comparisonLabel: String,
     isIncomeRow: Boolean,
     showChevron: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
 
@@ -121,6 +129,14 @@ private fun MetricRow(
 
     val rowTint = if (isIncomeRow) CashioSemantic.IncomeGreen else CashioSemantic.ExpenseRed
 
+    // Stabilize animations: convert to formatted strings (prevents animation spam from tiny float diffs)
+    val amountText = remember(amount, currencySymbol) {
+        "$currencySymbol${formatCompactAmount(amount)}"
+    }
+    val deltaText = remember(delta, currencySymbol, comparisonLabel) {
+        buildDeltaText(delta, currencySymbol, comparisonLabel)
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -128,8 +144,11 @@ private fun MetricRow(
             .clip(RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
+                // keep ripple (default indication) so the row feels tappable
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                }
             )
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -152,28 +171,26 @@ private fun MetricRow(
                     tint = rowTint,
                     modifier = Modifier.size(24.dp)
                 )
-
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
                 AnimatedContent(
-                    targetState = delta,
+                    targetState = deltaText,
                     transitionSpec = {
                         (slideInVertically { it } + fadeIn()).togetherWith(
                             slideOutVertically { -it } + fadeOut()
                         )
                     },
                     label = "MetricRowDelta"
-                ) { target ->
+                ) { targetText ->
                     val deltaColor = deltaColor(
-                        delta = target,
+                        delta = delta,
                         isIncomeRow = isIncomeRow,
                         neutral = MaterialTheme.colorScheme.onSurfaceVariant,
                         income = CashioSemantic.IncomeGreen,
@@ -184,9 +201,9 @@ private fun MetricRow(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        if (target != 0.0) {
+                        if (delta != 0.0) {
                             Icon(
-                                imageVector = if (target > 0) Icons.Default.NorthEast else Icons.Default.SouthWest,
+                                imageVector = if (delta > 0) Icons.Default.NorthEast else Icons.Default.SouthWest,
                                 contentDescription = null,
                                 tint = deltaColor,
                                 modifier = Modifier.size(16.dp)
@@ -194,7 +211,7 @@ private fun MetricRow(
                         }
 
                         Text(
-                            text = deltaText(target, currencySymbol),
+                            text = targetText,
                             style = MaterialTheme.typography.bodySmall,
                             color = deltaColor,
                             fontWeight = FontWeight.Medium
@@ -210,16 +227,16 @@ private fun MetricRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AnimatedContent(
-                targetState = amount,
+                targetState = amountText,
                 transitionSpec = {
                     (slideInVertically { it } + fadeIn()).togetherWith(
                         slideOutVertically { -it } + fadeOut()
                     )
                 },
                 label = "MetricRowAmount"
-            ) { target ->
+            ) { targetText ->
                 Text(
-                    text = "$currencySymbol${formatCompactAmount(target)}",
+                    text = targetText,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -239,15 +256,13 @@ private fun MetricRow(
 }
 
 /**
- * Delta text. You can replace "last month" with a passed-in label later (e.g., "vs last week").
+ * Delta text.
+ * Keeps neutral copy simple and supports different comparisons: "last week", "last month", etc.
  */
-private fun deltaText(delta: Double, currencySymbol: String): String {
+private fun buildDeltaText(delta: Double, currencySymbol: String, comparisonLabel: String): String {
+    if (delta == 0.0) return "Same as $comparisonLabel"
     val amount = "$currencySymbol${formatCompactAmount(abs(delta))}"
-    return when {
-        delta > 0 -> "$amount more than last month"
-        delta < 0 -> "$amount less than last month"
-        else -> "Same as last month"
-    }
+    return if (delta > 0) "$amount more than $comparisonLabel" else "$amount less than $comparisonLabel"
 }
 
 /**
@@ -272,13 +287,23 @@ private fun formatCompactAmount(value: Double): String {
     return when {
         v >= 1_000_000 -> {
             val x = v / 1_000_000.0
-            if (x < 10) String.format("%.1fM", x) else String.format("%.0fM", x)
+            if (x < 10) String.format(Locale.US, "%.1fM", x) else String.format(
+                Locale.US,
+                "%.0fM",
+                x
+            )
         }
+
         v >= 1_000 -> {
             val x = v / 1_000.0
-            if (x < 10) String.format("%.1fK", x) else String.format("%.0fK", x)
+            if (x < 10) String.format(Locale.US, "%.1fK", x) else String.format(
+                Locale.US,
+                "%.0fK",
+                x
+            )
         }
-        else -> String.format("%.0f", v)
+
+        else -> String.format(Locale.US, "%.0f", v)
     }
 }
 

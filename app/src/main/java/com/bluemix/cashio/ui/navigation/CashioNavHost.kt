@@ -1,4 +1,4 @@
-package com.bluemix.cashio.core.navigation
+package com.bluemix.cashio.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,31 +35,44 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.bluemix.cashio.R
-import com.bluemix.cashio.presentation.analytics.AnalyticsScreen
+import com.bluemix.cashio.presentation.add.AddExpenseScreen
+import com.bluemix.cashio.presentation.analytics.ui.AnalyticsScreen
 import com.bluemix.cashio.presentation.categories.CategoriesScreen
 import com.bluemix.cashio.presentation.common.PlaceholderScreen
 import com.bluemix.cashio.presentation.history.HistoryScreen
 import com.bluemix.cashio.presentation.home.DashboardScreen
-import com.bluemix.cashio.presentation.keywordmapping.KeywordMappingScreen
-import com.bluemix.cashio.presentation.settings.SettingsScreen
-import com.bluemix.cashio.presentation.transaction.AddExpenseScreen
-import com.bluemix.cashio.presentation.transactiondetails.TransactionDetailsScreen
-import com.bluemix.cashio.presentation.transactions.TransactionsScreen
+import com.bluemix.cashio.presentation.keyword.KeywordMappingScreen
+import com.bluemix.cashio.presentation.settings.ui.SettingsScreen
+import com.bluemix.cashio.presentation.splash.SplashScreen
+import com.bluemix.cashio.presentation.transaction.TransactionDetailsScreen
+import com.bluemix.cashio.presentation.transaction.TransactionsScreen
+
+private object NavUi {
+    val FabSize = 56.dp
+    val FabOverlapOffset = 45.dp
+    val FabGapWidth = FabSize
+    val BottomBarShape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp)
+    const val BottomBarAnimMs = 300
+    const val FabAnimMs = 200
+}
 
 @Composable
 fun CashioNavHost() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = backStackEntry?.destination
 
-    val showBottomBar = backStackEntry.shouldShowBottomBar()
-    val showFab = backStackEntry.shouldShowFab()
+    val showBottomBar = currentDestination.shouldShowBottomBar()
+    val showFab = currentDestination.shouldShowFab()
 
     val bottomNavItems = listOf(
         BottomNavItem(
@@ -71,7 +85,7 @@ fun CashioNavHost() {
             title = "History",
             selectedIcon = NavIcon.Drawable(R.drawable.historyselected),
             unselectedIcon = NavIcon.Drawable(R.drawable.historyunselected),
-            route = Route.Expenses
+            route = Route.History
         ),
         BottomNavItem(
             title = "Analytics",
@@ -87,18 +101,21 @@ fun CashioNavHost() {
         )
     )
 
-
     Scaffold(
         contentWindowInsets = WindowInsets(0),
-        // Important: don’t force navigationBarsPadding() globally.
-        // Scaffold will give proper content padding to avoid overlaps when needed.
         bottomBar = {
             AnimatedVisibility(
                 visible = showBottomBar,
-                enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)),
-                exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(300))
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(NavUi.BottomBarAnimMs)
+                ),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(NavUi.BottomBarAnimMs)
+                )
             ) {
-                BottomBarWithFabCutSpace(
+                BottomBarWithFabGap(
                     navController = navController,
                     items = bottomNavItems
                 )
@@ -107,8 +124,11 @@ fun CashioNavHost() {
         floatingActionButton = {
             AnimatedVisibility(
                 visible = showFab,
-                enter = fadeIn(tween(200)),
-                exit = fadeOut(tween(200))
+                enter = fadeIn(tween(NavUi.FabAnimMs)) +
+                        slideInVertically { it / 2 },
+                exit = fadeOut(tween(NavUi.FabAnimMs)) +
+                        slideOutVertically { it / 2 }
+
             ) {
                 FloatingActionButton(
                     onClick = {
@@ -120,52 +140,46 @@ fun CashioNavHost() {
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
-                        .size(56.dp)
-                        .offset(y = (45).dp) // adjust for how much overlap you want
+                        .size(NavUi.FabSize)
+                        .offset(y = NavUi.FabOverlapOffset)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Add Transaction")
                 }
             }
         },
-        // Make FAB overlap the bottom bar like your design
-        floatingActionButtonPosition = androidx.compose.material3.FabPosition.Center
+        floatingActionButtonPosition = FabPosition.Center
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // This padding is KEY: it prevents content going under bottom bar
-                // and handles system insets correctly.
-                .padding(paddingValues)
+                .padding(paddingValues),
         ) {
             NavHost(
                 navController = navController,
-                startDestination = Route.Dashboard
+                startDestination = Route.Onboarding
             ) {
                 composable<Route.Onboarding> {
                     PlaceholderScreen(
                         title = "Onboarding",
                         onNavigate = {
                             navController.navigate(Route.Dashboard) {
-                                popUpTo(Route.Onboarding) {
-                                    inclusive = true
-                                } // ✅ remove onboarding
+                                popUpTo(Route.Onboarding) { inclusive = true }
                                 launchSingleTop = true
                             }
                         }
                     )
                 }
 
-
                 composable<Route.Dashboard> {
                     DashboardScreen(
-                        onNavigateToWallet = { navController.navigate(Route.Expenses) },
+                        onNavigateToWallet = { navController.navigate(Route.History) },
                         onNavigateToAllTransactions = { navController.navigate(Route.Transactions) },
                         onNavigateToTransactionDetails = { id ->
                             navController.navigate(Route.TransactionDetails(id))
                         }
                     )
                 }
-                // New full transactions screen (explicit)
+
                 composable<Route.Transactions> {
                     TransactionsScreen(
                         onNavigateBack = { navController.popBackStack() },
@@ -174,6 +188,7 @@ fun CashioNavHost() {
                         }
                     )
                 }
+
                 composable<Route.TransactionDetails> { entry ->
                     val route = entry.toRoute<Route.TransactionDetails>()
                     TransactionDetailsScreen(
@@ -183,20 +198,22 @@ fun CashioNavHost() {
                             navController.navigate(Route.AddExpense(expenseId = id))
                         }
                     )
-
                 }
-                composable<Route.Expenses> {
-                    HistoryScreen(onTransactionClick = {id ->
-                        navController.navigate(Route.TransactionDetails(id)) })
+
+                composable<Route.History> {
+                    HistoryScreen(
+                        onTransactionClick = { id ->
+                            navController.navigate(Route.TransactionDetails(id))
+                        }
+                    )
                 }
 
                 composable<Route.AddExpense> { entry ->
                     val route = entry.toRoute<Route.AddExpense>()
-
                     AddExpenseScreen(
                         expenseId = route.expenseId,
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateCategory = { navController.navigate(Route.Categories) }
+                        onNavigateToCategories = { navController.navigate(Route.Categories) }
                     )
                 }
 
@@ -211,7 +228,8 @@ fun CashioNavHost() {
                 composable<Route.Settings> {
                     SettingsScreen(
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateToKeywordMapping = { navController.navigate(Route.KeywordMapping) }
+                        onNavigateToKeywordMapping = { navController.navigate(Route.KeywordMapping) },
+                        onNavigateToCategories = { navController.navigate(Route.Categories) }
                     )
                 }
 
@@ -219,47 +237,53 @@ fun CashioNavHost() {
                     KeywordMappingScreen(onNavigateBack = { navController.popBackStack() })
                 }
 
+                composable<Route.Splash> {
+                    SplashScreen(
+                        onFinished = {
+                            navController.navigate(Route.Dashboard) {
+                                popUpTo(Route.Splash) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
 
             }
         }
     }
 }
 
-
 @Composable
 private fun NavIconSlot(
     icon: NavIcon,
-    contentDescription: String?
+    contentDescription: String?,
 ) {
     when (icon) {
-        is NavIcon.Vector -> {
-            Icon(
-                imageVector = icon.imageVector,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        is NavIcon.Drawable -> {
-            Icon(
-                painter = painterResource(id = icon.resId),
-                contentDescription = contentDescription,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+        is NavIcon.Vector -> Icon(
+            imageVector = icon.imageVector,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(24.dp)
+        )
+
+        is NavIcon.Drawable -> Icon(
+            painter = painterResource(id = icon.resId),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(24.dp)
+        )
     }
 }
 
 /**
- * Bottom bar that leaves a center gap under the FAB (no cutout, just spacing).
+ * Bottom bar that leaves a center gap under the FAB.
  */
 @Composable
-private fun BottomBarWithFabCutSpace(
-    navController: androidx.navigation.NavHostController,
-    items: List<BottomNavItem>
+private fun BottomBarWithFabGap(
+    navController: NavHostController,
+    items: List<BottomNavItem>,
 ) {
     Surface(
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        tonalElevation = 12.dp,
+        shape = NavUi.BottomBarShape,
+        // tonalElevation = 12.dp,
         shadowElevation = 12.dp,
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth()
@@ -268,21 +292,14 @@ private fun BottomBarWithFabCutSpace(
             containerColor = Color.Transparent,
             tonalElevation = 0.dp
         ) {
-            // left 2
             items.take(2).forEach { item ->
                 val isSelected = navController.currentDestinationMatches(item.route)
                 val icon = if (isSelected) item.selectedIcon else item.unselectedIcon
-
                 NavigationBarItem(
                     selected = isSelected,
-                    onClick = {
-                        navController.navigate(item.route) {
-                            popUpTo(Route.Dashboard) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    icon = {
+                    onClick = { navController.navigateBottom(item.route) }
+,
+                            icon = {
                         NavIconSlot(
                             icon = icon,
                             contentDescription = item.title
@@ -293,23 +310,16 @@ private fun BottomBarWithFabCutSpace(
                 )
             }
 
-            Spacer(modifier = Modifier.width(56.dp))
+            Spacer(modifier = Modifier.width(NavUi.FabGapWidth))
 
-            // right 2
             items.takeLast(2).forEach { item ->
                 val isSelected = navController.currentDestinationMatches(item.route)
                 val icon = if (isSelected) item.selectedIcon else item.unselectedIcon
-
                 NavigationBarItem(
                     selected = isSelected,
-                    onClick = {
-                        navController.navigate(item.route) {
-                            popUpTo(Route.Dashboard) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    icon = {
+                    onClick = { navController.navigateBottom(item.route) }
+,
+                            icon = {
                         NavIconSlot(
                             icon = icon,
                             contentDescription = item.title
@@ -322,7 +332,13 @@ private fun BottomBarWithFabCutSpace(
         }
     }
 }
-
+private fun NavHostController.navigateBottom(route: Route) {
+    navigate(route) {
+        popUpTo(Route.Dashboard) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
 
 @Composable
 private fun navItemColors() = NavigationBarItemDefaults.colors(
@@ -333,9 +349,31 @@ private fun navItemColors() = NavigationBarItemDefaults.colors(
     indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
 )
 
-private fun androidx.navigation.NavHostController.currentDestinationMatches(route: Route): Boolean {
-    val target = route::class.qualifiedName
-    return currentBackStackEntry?.destination
-        ?.hierarchy
-        ?.any { it.route == target } == true
+/**
+ * Centralized route matching.
+ *
+ * For typed routes, the destination.route is typically the qualified name of the route class.
+ * This keeps logic in one place, so if you change navigation libraries you only update this.
+ */
+private fun NavHostController.currentDestinationMatches(route: Route): Boolean {
+    val target = route::class.qualifiedName ?: return false
+    val destination = currentBackStackEntry?.destination ?: return false
+    return destination.hierarchy.any { it.route == target }
 }
+
+/**
+ * Visibility policy for bottom bar / FAB.
+ * Keep this close to navigation, not scattered across screens.
+ */
+private val MAIN_DESTINATIONS = setOf(
+    Route.Dashboard::class.qualifiedName,
+    Route.History::class.qualifiedName,
+    Route.Analytics::class.qualifiedName,
+    Route.Settings::class.qualifiedName
+)
+
+private fun NavDestination?.isMainDestination(): Boolean =
+    this?.route in MAIN_DESTINATIONS
+
+private fun NavDestination?.shouldShowBottomBar() = isMainDestination()
+private fun NavDestination?.shouldShowFab() = isMainDestination()

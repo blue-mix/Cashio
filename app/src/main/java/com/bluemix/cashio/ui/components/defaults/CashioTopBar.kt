@@ -1,4 +1,4 @@
-package com.bluemix.cashio.components
+package com.bluemix.cashio.ui.components.defaults
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
@@ -21,9 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -132,12 +132,12 @@ data class TopBarAction(
 /* -------------------------------------------------------------------------- */
 
 private object CashioTopBarDefaults {
-    val IconSize = 40.dp
+    val IconSize = 24.dp
     val IconPadding = 8.dp
     val IconTonalElevation = 2.dp
     val IconShadowElevation = 2.dp
     const val IconSurfaceAlpha = 0.96f
-
+    val ButtonSize=40.dp
     val DatePillRadius = 999.dp
     val DatePillPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
     val DateIconSpacing = 8.dp
@@ -147,10 +147,10 @@ private object CashioTopBarDefaults {
 private fun TopBarIconPill(
     icon: TopBarIcon,
     onClick: () -> Unit,
-    enabled: Boolean
+    enabled: Boolean,
 ) {
     Surface(
-        modifier = Modifier.size(CashioTopBarDefaults.IconSize),
+        modifier = Modifier.size(CashioTopBarDefaults.ButtonSize),
         shape = CircleShape,
         tonalElevation = CashioTopBarDefaults.IconTonalElevation,
         shadowElevation = CashioTopBarDefaults.IconShadowElevation,
@@ -192,10 +192,7 @@ private fun DateTitle(
 ) {
     val dateText = remember(date) { date.toTopBarLabel() }
 
-    Surface(
-        shape = RoundedCornerShape(CashioTopBarDefaults.DatePillRadius),
-        color = Color.Transparent
-    ) {
+
         Row(
             modifier = Modifier.padding(CashioTopBarDefaults.DatePillPadding),
             horizontalArrangement = Arrangement.spacedBy(CashioTopBarDefaults.DateIconSpacing),
@@ -215,7 +212,7 @@ private fun DateTitle(
                         painter = painterResource(icon.resId),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier =Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -228,7 +225,7 @@ private fun DateTitle(
             )
         }
     }
-}
+
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */

@@ -1,6 +1,5 @@
-package com.bluemix.cashio.presentation.transactions
+package com.bluemix.cashio.presentation.transaction
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,53 +10,40 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bluemix.cashio.R
-import com.bluemix.cashio.components.CashioTopBar
-import com.bluemix.cashio.components.CashioTopBarTitle
-import com.bluemix.cashio.components.TopBarAction
-import com.bluemix.cashio.components.TopBarIcon
-import com.bluemix.cashio.components.TransactionListItem
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluemix.cashio.presentation.common.UiState
-import com.bluemix.cashio.presentation.transaction.TransactionViewModel
-import com.bluemix.cashio.presentation.transaction.TxTypeFilter
+import com.bluemix.cashio.presentation.transaction.components.TransactionEmptyCard
+import com.bluemix.cashio.presentation.transaction.components.TransactionErrorCard
+import com.bluemix.cashio.presentation.transaction.components.TransactionSearchBar
+import com.bluemix.cashio.presentation.transaction.components.TransactionTypeFilterRow
+import com.bluemix.cashio.ui.components.cards.TransactionListItem
+import com.bluemix.cashio.ui.components.defaults.CashioTopBar
+import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
+import com.bluemix.cashio.ui.components.defaults.TopBarAction
+import com.bluemix.cashio.ui.components.defaults.TopBarIcon
 import org.koin.compose.viewmodel.koinViewModel
 
-/**
- * All transactions screen (search + type filter) using the shared TransactionViewModel.
- */
 @Composable
 fun TransactionsScreen(
     onNavigateBack: () -> Unit,
     onTransactionClick: (String) -> Unit,
     viewModel: TransactionViewModel = koinViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
@@ -74,15 +60,15 @@ fun TransactionsScreen(
         }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            when (val ui = state.list) {
-                is UiState.Idle, is UiState.Loading -> {
+            when (val ui = state.transactionsUi) {
+                UiState.Idle, UiState.Loading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
 
                 is UiState.Error -> {
-                    ErrorCard(
+                    TransactionErrorCard(
                         message = ui.message,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -106,7 +92,7 @@ fun TransactionsScreen(
                         )
                     ) {
                         item {
-                            SearchBar(
+                            TransactionSearchBar(
                                 query = state.query,
                                 onQueryChange = viewModel::setQuery,
                                 onClear = { viewModel.setQuery("") }
@@ -114,7 +100,7 @@ fun TransactionsScreen(
                         }
 
                         item {
-                            TypeFilterRow(
+                            TransactionTypeFilterRow(
                                 filter = state.typeFilter,
                                 onChange = viewModel::setTypeFilter
                             )
@@ -141,7 +127,7 @@ fun TransactionsScreen(
 
                         if (filtered.isEmpty()) {
                             item {
-                                EmptyCard(
+                                TransactionEmptyCard(
                                     title = if (state.query.isBlank()) "No transactions yet" else "No matches",
                                     subtitle = if (state.query.isBlank())
                                         "Once you add or parse transactions, they’ll show up here."
@@ -161,11 +147,7 @@ fun TransactionsScreen(
                                     showCategoryIcon = true,
                                     showChevron = true,
                                     showDate = true,
-                                    onClick = {
-                                        // keep VM in sync + navigate
-                                        viewModel.selectTransaction(tx.id)
-                                        onTransactionClick(tx.id)
-                                    }
+                                    onClick = { onTransactionClick(tx.id) }
                                 )
                             }
                         }
@@ -173,70 +155,6 @@ fun TransactionsScreen(
                 }
             }
         }
-    }
-}
-
-/* ----------------------------- UI Pieces ----------------------------- */
-
-@Composable
-private fun SearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClear: () -> Unit
-) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        shape = RoundedCornerShape(14.dp),
-        leadingIcon = { Icon(painter = painterResource(R.drawable.search), contentDescription = null,
-            Modifier.size(20.dp)) },
-        trailingIcon = {
-            AnimatedVisibility(visible = query.isNotBlank()) {
-                IconButton(onClick = onClear) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Clear",
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        },
-        placeholder = { Text("Search title, category, amount…") },
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-        )
-    )
-}
-
-@Composable
-private fun TypeFilterRow(
-    filter: TxTypeFilter,
-    onChange: (TxTypeFilter) -> Unit
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        FilterChip(
-            selected = filter == TxTypeFilter.ALL,
-            onClick = { onChange(TxTypeFilter.ALL) },
-            label = { Text("All") },
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                selectedLabelColor = MaterialTheme.colorScheme.primary
-            )
-        )
-        FilterChip(
-            selected = filter == TxTypeFilter.EXPENSE,
-            onClick = { onChange(TxTypeFilter.EXPENSE) },
-            label = { Text("Expense") }
-        )
-        FilterChip(
-            selected = filter == TxTypeFilter.INCOME,
-            onClick = { onChange(TxTypeFilter.INCOME) },
-            label = { Text("Income") }
-        )
     }
 }
 
@@ -248,56 +166,5 @@ private fun ColumnScaffold(
     androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
         top()
         content()
-    }
-}
-
-@Composable
-private fun EmptyCard(
-    title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun ErrorCard(
-    message: String,
-    modifier: Modifier = Modifier,
-    onRetry: () -> Unit
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.errorContainer
-    ) {
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text("⚠️", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            androidx.compose.material3.OutlinedButton(onClick = onRetry) { Text("Retry") }
-        }
     }
 }

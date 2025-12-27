@@ -1,4 +1,4 @@
-package com.bluemix.cashio.components
+package com.bluemix.cashio.ui.components.chart
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -37,7 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bluemix.cashio.presentation.analytics.ChartPeriod
+import com.bluemix.cashio.presentation.analytics.vm.ChartPeriod
+import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.theme.CashioSemantic
 import ir.ehsannarmani.compose_charts.ColumnChart
 import ir.ehsannarmani.compose_charts.models.BarProperties
@@ -76,19 +77,26 @@ fun FinanceStatsCard(
 ) {
     var isPeriodMenuExpanded by remember { mutableStateOf(false) }
 
+    val labelCount = chart.labels.size
+    val hasLabels = labelCount > 0
+
+    // Guard: avoid chart spam when all values are 0 (optional UX improvement)
+    val hasAnyValue = remember(chart.incomeData, chart.expenseData) {
+        (chart.incomeData.any { it != 0.0 } || chart.expenseData.any { it != 0.0 })
+    }
+
     // Adaptive bar sizing based on data density
-    val (barThickness, barSpacing, cornerRadius) = remember(chart.labels.size) {
-        val count = chart.labels.size
+    val (barThickness, barSpacing, cornerRadius) = remember(labelCount) {
         Triple(
             when {
-                count <= 5 -> 24.dp
-                count <= 6 -> 12.dp
+                labelCount <= 5 -> 24.dp
+                labelCount <= 6 -> 12.dp
                 else -> 10.dp
             },
-            if (count <= 6) 4.dp else 2.dp,
+            if (labelCount <= 6) 4.dp else 2.dp,
             when {
-                count <= 5 -> 12.dp
-                count <= 6 -> 6.dp
+                labelCount <= 5 -> 12.dp
+                labelCount <= 6 -> 6.dp
                 else -> 5.dp
             }
         )
@@ -113,8 +121,10 @@ fun FinanceStatsCard(
         )
     }
 
-    val barGroups = remember(chart) {
-        chart.labels.indices.map { index ->
+    // Build bars safely even if lists mismatch
+    val barGroups = remember(chart.labels, chart.incomeData, chart.expenseData) {
+        val safeCount = chart.labels.size
+        List(safeCount) { index ->
             Bars(
                 label = chart.labels[index],
                 values = listOf(
@@ -141,12 +151,15 @@ fun FinanceStatsCard(
                 selectedPeriod = selectedPeriod,
                 expanded = isPeriodMenuExpanded,
                 onExpandedChange = { isPeriodMenuExpanded = it },
-                onPeriodChange = onPeriodChange
+                onPeriodChange = { period ->
+                    isPeriodMenuExpanded = false
+                    onPeriodChange(period)
+                }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            if (chart.labels.isEmpty()) {
+            if (!hasLabels || !hasAnyValue) {
                 Text(
                     text = "No data for ${selectedPeriod.label}",
                     style = MaterialTheme.typography.bodyMedium,

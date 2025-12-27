@@ -1,7 +1,8 @@
-package com.bluemix.cashio.presentation.transactiondetails
+package com.bluemix.cashio.presentation.transaction
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,26 +27,22 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bluemix.cashio.components.CashioCard
-import com.bluemix.cashio.components.CashioTopBar
-import com.bluemix.cashio.components.CashioTopBarTitle
-import com.bluemix.cashio.components.TopBarAction
-import com.bluemix.cashio.components.TopBarIcon
-import com.bluemix.cashio.domain.model.Expense
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluemix.cashio.domain.model.TransactionType
 import com.bluemix.cashio.presentation.common.UiState
-import com.bluemix.cashio.presentation.transaction.TransactionViewModel
-import com.bluemix.cashio.ui.theme.CashioSemantic.ExpenseRed
-import com.bluemix.cashio.ui.theme.CashioSemantic.IncomeGreen
+import com.bluemix.cashio.presentation.transaction.components.TransactionDetailsHeaderCard
+import com.bluemix.cashio.presentation.transaction.components.TransactionDetailsInfoCard
+import com.bluemix.cashio.ui.components.defaults.CashioTopBar
+import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
+import com.bluemix.cashio.ui.components.defaults.TopBarAction
+import com.bluemix.cashio.ui.components.defaults.TopBarIcon
 import org.koin.compose.viewmodel.koinViewModel
 import java.time.format.DateTimeFormatter
 
@@ -56,16 +53,24 @@ fun TransactionDetailsScreen(
     onEditClick: (String) -> Unit,
     viewModel: TransactionViewModel = koinViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     LaunchedEffect(transactionId) {
         viewModel.selectTransaction(transactionId)
     }
 
+    // Navigate back only when delete actually succeeds.
+    LaunchedEffect(state.deleteSuccess) {
+        if (state.deleteSuccess) {
+            viewModel.consumeDeleteSuccess()
+            onNavigateBack()
+        }
+    }
+
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    androidx.compose.foundation.layout.Column(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(bottom = navBarPadding)
@@ -79,8 +84,8 @@ fun TransactionDetailsScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
         )
 
-        when (val ui = state.details) {
-            is UiState.Loading, is UiState.Idle -> {
+        when (val ui = state.detailsUi) {
+            UiState.Loading, UiState.Idle -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
@@ -115,17 +120,17 @@ fun TransactionDetailsScreen(
                         bottom = navBarPadding + 16.dp + 72.dp
                     )
                 ) {
-                    item { HeaderCard(tx) }
+                    item { TransactionDetailsHeaderCard(tx) }
 
                     item {
-                        InfoCard(
+                        TransactionDetailsInfoCard(
                             title = "Details",
                             rows = listOf(
                                 "Type" to (if (tx.transactionType == TransactionType.EXPENSE) "Expense" else "Income"),
                                 "Category" to "${tx.category.icon}  ${tx.category.name}",
                                 "Date" to tx.date.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
                             ) + listOfNotNull(
-                                tx.note?.takeIf { it.isNotBlank() }?.let { "Note" to it }
+                                tx.note.takeIf { it.isNotBlank() }?.let { "Note" to it }
                             )
                         )
                     }
@@ -136,6 +141,7 @@ fun TransactionDetailsScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Button(
+                                enabled = !state.isDeleting,
                                 onClick = { onEditClick(tx.id) },
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -145,12 +151,13 @@ fun TransactionDetailsScreen(
                             }
 
                             Button(
+                                enabled = !state.isDeleting,
                                 onClick = { showDeleteConfirm = true },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(Icons.Default.Delete, contentDescription = null)
                                 Spacer(Modifier.padding(start = 8.dp))
-                                Text("Delete")
+                                Text(if (state.isDeleting) "Deleting..." else "Delete")
                             }
                         }
                     }
@@ -158,87 +165,34 @@ fun TransactionDetailsScreen(
 
                 if (showDeleteConfirm) {
                     AlertDialog(
-                        onDismissRequest = { showDeleteConfirm = false },
+                        onDismissRequest = { if (!state.isDeleting) showDeleteConfirm = false },
                         title = { Text("Delete transaction?") },
                         text = { Text("This action can’t be undone.") },
                         confirmButton = {
                             TextButton(
+                                enabled = !state.isDeleting,
                                 onClick = {
-                                    showDeleteConfirm = false
                                     viewModel.deleteTransaction(tx.id)
-                                    onNavigateBack()
-                                    viewModel.consumeDeleteSuccess()
                                 }
-                            ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                            ) {
+                                Text("Delete", color = MaterialTheme.colorScheme.error)
+                            }
                         },
                         dismissButton = {
-                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                            TextButton(
+                                enabled = !state.isDeleting,
+                                onClick = { showDeleteConfirm = false }
+                            ) { Text("Cancel") }
                         }
                     )
                 }
-            }
-        }
-    }
-}
 
-@Composable
-private fun HeaderCard(tx: Expense) {
-    val color = if (tx.transactionType == TransactionType.EXPENSE) ExpenseRed else IncomeGreen
-
-    CashioCard(
-        modifier = Modifier.fillMaxWidth(),
-        padding = PaddingValues(16.dp),
-        cornerRadius = 16.dp,
-        showBorder = true
-    ) {
-        androidx.compose.foundation.layout.Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = tx.title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "₹${String.format("%,.2f", tx.amount)}",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = color
-            )
-            Text(
-                text = "${tx.category.icon}  ${tx.category.name}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun InfoCard(
-    title: String,
-    rows: List<Pair<String, String>>
-) {
-    CashioCard(
-        modifier = Modifier.fillMaxWidth(),
-        padding = PaddingValues(16.dp),
-        cornerRadius = 16.dp,
-        showBorder = true
-    ) {
-        androidx.compose.foundation.layout.Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            rows.forEach { (k, v) ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(v, fontWeight = FontWeight.Medium)
+                // Auto-close dialog after delete starts (optional UX)
+                LaunchedEffect(state.isDeleting) {
+                    if (state.isDeleting) showDeleteConfirm = false
                 }
             }
         }
     }
 }
+

@@ -1,5 +1,4 @@
-
-package com.bluemix.cashio.components
+package com.bluemix.cashio.ui.components.cards
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -21,10 +20,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.domain.model.TransactionType
+import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.theme.CashioSemantic
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -78,23 +81,21 @@ fun TransactionListItem(
         }
     }
 
-    val dateText = remember(dateTime) { formatTransactionDate(dateTime) }
+    val now = remember { LocalDateTime.now() }
+    val dateText = remember(dateTime, now) { formatTransactionDate(dateTime, now) }
+
 
     CashioCard(
         modifier = modifier.fillMaxWidth(),
-        onClick = onClick
+        onClick = onClick,
+        containerColor = if (compact)
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        else
+            MaterialTheme.colorScheme.surface
     ) {
-        // Subtle compact tint inside the card shell
-        val rowModifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(
-                if (compact) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                else Color.Transparent
-            )
 
         Row(
-            modifier = rowModifier,
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -117,6 +118,7 @@ fun TransactionListItem(
                     else MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
+
                 )
 
                 if (showDate) {
@@ -160,8 +162,8 @@ fun TransactionListItem(
 private fun CategoryIconChip(
     icon: String,
     color: Color,
-    size: androidx.compose.ui.unit.Dp,
-    fontSize: androidx.compose.ui.unit.TextUnit
+    size: Dp,
+    fontSize: TextUnit
 ) {
     Box(
         modifier = Modifier
@@ -172,7 +174,7 @@ private fun CategoryIconChip(
     ) {
         Text(
             text = icon,
-            style = MaterialTheme.typography.headlineSmall.copy(fontSize = fontSize)
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = fontSize)
         )
     }
 }

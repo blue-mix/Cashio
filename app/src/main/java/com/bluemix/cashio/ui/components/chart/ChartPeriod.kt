@@ -1,6 +1,6 @@
-package com.bluemix.cashio.components
+package com.bluemix.cashio.ui.components.chart
 
-import com.bluemix.cashio.presentation.analytics.ChartPeriod
+import com.bluemix.cashio.presentation.analytics.vm.ChartPeriod
 
 val ChartPeriod.label: String
     get() = when (this) {
