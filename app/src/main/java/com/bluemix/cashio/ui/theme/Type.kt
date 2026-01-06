@@ -12,33 +12,42 @@ import androidx.compose.ui.unit.sp
 import com.bluemix.cashio.R
 
 /**
- * Manrope variable font family
- * Supports Android O+ with fallback for older versions
+ * Defines the custom font family used throughout the application.
+ *
+ * This implementation leverages Variable Fonts (Manrope) on supported Android versions (Oreo 8.0+).
+ * Variable fonts allow for a single font file to support multiple weights and styles, reducing APK size.
+ *
+ * For devices running Android versions older than Oreo (API < 26), it gracefully falls back
+ * to the system's default sans-serif font to ensure readability.
  */
 @OptIn(ExperimentalTextApi::class)
 val ManropeFontFamily = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-    // Variable font for Android O+
     FontFamily(
         Font(
-            R.font.manrope,  // Your variable font file
+            R.font.manrope,
             variationSettings = FontVariation.Settings(
-                FontVariation.weight(400)  // Default weight
+                FontVariation.weight(400)
             )
         )
     )
 } else {
-    // Fallback to system font for older Android
     FontFamily.SansSerif
 }
 
 /**
- * Material 3 Typography with Manrope
+ * The centralized Material 3 Typography definitions for Cashio.
+ *
+ * All text styles utilize the custom [ManropeFontFamily] defined above.
+ * Weights are explicitly set (e.g., Bold, SemiBold, Normal) to map correctly
+ * to the variable font axes.
+ *
+ * Usage in Composables:
+ * `Text(text = "Hello", style = MaterialTheme.typography.headlineMedium)`
  */
 val CashioTypography = Typography(
-    // Display styles (largest)
     displayLarge = TextStyle(
         fontFamily = ManropeFontFamily,
-        fontWeight = FontWeight.Bold,  // VF will use weight 700
+        fontWeight = FontWeight.Bold,
         fontSize = 57.sp,
         lineHeight = 64.sp,
         letterSpacing = (-0.25).sp
@@ -57,11 +66,9 @@ val CashioTypography = Typography(
         lineHeight = 44.sp,
         letterSpacing = 0.sp
     ),
-
-    // Headline styles
     headlineLarge = TextStyle(
         fontFamily = ManropeFontFamily,
-        fontWeight = FontWeight.SemiBold,  // VF will use weight 600
+        fontWeight = FontWeight.SemiBold,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp
@@ -80,8 +87,6 @@ val CashioTypography = Typography(
         lineHeight = 32.sp,
         letterSpacing = 0.sp
     ),
-
-    // Title styles
     titleLarge = TextStyle(
         fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.SemiBold,
@@ -91,7 +96,7 @@ val CashioTypography = Typography(
     ),
     titleMedium = TextStyle(
         fontFamily = ManropeFontFamily,
-        fontWeight = FontWeight.SemiBold,  // VF will use weight 500
+        fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.15.sp
@@ -103,11 +108,9 @@ val CashioTypography = Typography(
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
-
-    // Body styles (most common)
     bodyLarge = TextStyle(
         fontFamily = ManropeFontFamily,
-        fontWeight = FontWeight.Normal,  // VF will use weight 400
+        fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
@@ -126,8 +129,6 @@ val CashioTypography = Typography(
         lineHeight = 16.sp,
         letterSpacing = 0.4.sp
     ),
-
-    // Label styles (buttons, tabs)
     labelLarge = TextStyle(
         fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Medium,

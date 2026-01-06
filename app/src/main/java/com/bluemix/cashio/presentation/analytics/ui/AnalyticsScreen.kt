@@ -24,12 +24,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluemix.cashio.presentation.analytics.vm.AnalyticsViewModel
 import com.bluemix.cashio.ui.components.defaults.CashioTopBar
 import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import org.koin.compose.viewmodel.koinViewModel
 
-private val ScreenPadding = 16.dp
-private val SectionSpacing = 20.dp
-const val CurrencySymbol = "₹"
-
+/**
+ * Composable representing the Analytics screen of the Cashio application.
+ *
+ * This screen aggregates and displays financial data to the user, including:
+ * - An interactive bar chart for expenses over specific time periods.
+ * - Summary cards showing income/expense totals and their period-over-period deltas.
+ * - A breakdown of the top spending category.
+ *
+ * @param onNavigateBack Callback invoked when the user requests navigation back to the previous screen.
+ * @param viewModel The [AnalyticsViewModel] responsible for managing the UI state and business logic.
+ * Defaults to [koinViewModel].
+ */
 @Composable
 fun AnalyticsScreen(
     onNavigateBack: () -> Unit = {},
@@ -39,12 +49,13 @@ fun AnalyticsScreen(
     val haptic = LocalHapticFeedback.current
 
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
     val listContentPadding = remember(bottomInset) {
         PaddingValues(
-            start = ScreenPadding,
-            end = ScreenPadding,
+            start = CashioPadding.screen,
+            end = CashioPadding.screen,
             top = 0.dp,
-            bottom = bottomInset + ScreenPadding
+            bottom = bottomInset + CashioPadding.screen
         )
     }
 
@@ -56,15 +67,15 @@ fun AnalyticsScreen(
         CashioTopBar(
             title = CashioTopBarTitle.Text("Analytics"),
             contentColor = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = ScreenPadding)
+            modifier = Modifier.padding(horizontal = CashioPadding.screen)
         )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(SectionSpacing),
+            verticalArrangement = Arrangement.spacedBy(CashioSpacing.xl),
             contentPadding = listContentPadding
         ) {
-            item { Spacer(modifier = Modifier.height(8.dp)) }
+            item { Spacer(modifier = Modifier.height(CashioSpacing.small)) }
 
             item {
                 AnalyticsChartSection(
@@ -85,11 +96,9 @@ fun AnalyticsScreen(
                     expenseDelta = uiState.expenseDelta,
                     onIncomeClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        // TODO: navigate
                     },
                     onExpenseClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        // TODO: navigate
                     }
                 )
             }

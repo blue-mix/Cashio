@@ -9,16 +9,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -28,19 +24,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.bluemix.cashio.R
+import com.bluemix.cashio.core.format.CashioFormat
+import com.bluemix.cashio.core.format.CashioFormat.toPrettyMonthDay
+import com.bluemix.cashio.ui.components.cards.StateCard
+import com.bluemix.cashio.ui.components.cards.StateCardVariant
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import java.time.LocalDate
 import java.time.format.TextStyle
-import java.util.Locale
 
-private val EmptyStateCornerRadius = 16.dp
-
+/**
+ * The specialized Top Bar for the History screen.
+ *
+ * Unlike standard bars, this displays a large, formatted date header
+ * (e.g., "January 15") with the Year and Day of Week stacked next to it.
+ *
+ * @param selectedDate The currently active date filter. Defaults to Today if null.
+ * @param onTodayClick Callback triggered when the calendar action button is clicked.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryTopBar(
@@ -49,31 +53,33 @@ fun HistoryTopBar(
     modifier: Modifier = Modifier
 ) {
     val displayDate = selectedDate ?: LocalDate.now()
-    val locale = Locale.getDefault()
+    val locale = CashioFormat.locale()
 
     TopAppBar(
         modifier = modifier,
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(CashioSpacing.compact)
             ) {
+                // Main Date (e.g. "Jan 01")
                 Text(
                     text = displayDate.toPrettyMonthDay(locale),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold
                 )
 
+                // Stacked Year and Day Name
                 Column {
                     Text(
                         text = displayDate.year.toString(),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = displayDate.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -87,12 +93,16 @@ fun HistoryTopBar(
     )
 }
 
+/**
+ * A custom action button that jumps the calendar back to the current date.
+ * Features a spring scale animation on press and overlays the current day number
+ * onto the calendar icon.
+ */
 @Composable
 private fun TodayButton(onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
 
-    // Controlled “press-in” instead of bouncy scaling
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
         animationSpec = spring(
@@ -114,82 +124,35 @@ private fun TodayButton(onClick: () -> Unit) {
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
+            // Overlay current day number
             Text(
                 text = LocalDate.now().dayOfMonth.toString(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(top = CashioSpacing.xs)
             )
         }
     }
 }
 
+/**
+ * Displays a friendly empty state message when no transactions exist for the selected period.
+ * Wraps the generic [StateCard] for consistency.
+ */
 @Composable
 fun EmptyTransactionsState(
     selectedDate: LocalDate?,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(EmptyStateCornerRadius),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-        tonalElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(text = "📭", fontSize = 48.sp)
-            Text(
-                text = if (selectedDate != null) "No transactions on this day" else "No transactions yet",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = if (selectedDate != null) {
-                    "Select another date or add a new transaction"
-                } else {
-                    "Your transaction history will appear here"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.size(0.dp))
-        }
-    }
-}
-
-@Composable
-fun CenterMessage(
-    text: String,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurfaceVariant
-) {
-    Text(
-        text = text,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(modifier),
-        textAlign = TextAlign.Center,
-        color = color
+    StateCard(
+        variant = StateCardVariant.EMPTY,
+        emoji = "📭",
+        title = if (selectedDate != null) "No transactions on this day" else "No transactions yet",
+        message = if (selectedDate != null) {
+            "Select another date or add a new transaction"
+        } else {
+            "Your transaction history will appear here"
+        },
+        modifier = modifier
     )
-}
-/* ------------------------ Formatting Helpers ------------------------ */
-
-private fun LocalDate.toPrettyMonthDay(locale: Locale): String {
-    val month = this.month.getDisplayName(TextStyle.SHORT, locale)
-    return "$month $dayOfMonth${dayOfMonth.ordinalSuffix(locale)}"
-}
-
-private fun Int.ordinalSuffix(locale: Locale): String {
-    if (!locale.language.equals(Locale.ENGLISH.language, ignoreCase = true)) return ""
-    return when {
-        this in 11..13 -> "th"
-        this % 10 == 1 -> "st"
-        this % 10 == 2 -> "nd"
-        this % 10 == 3 -> "rd"
-        else -> "th"
-    }
 }

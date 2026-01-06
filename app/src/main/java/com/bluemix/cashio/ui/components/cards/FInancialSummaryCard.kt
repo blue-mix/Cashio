@@ -43,19 +43,24 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
+import com.bluemix.cashio.core.format.CashioFormat
 import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.components.defaults.CashioIcon
+import com.bluemix.cashio.ui.theme.CashioRadius
 import com.bluemix.cashio.ui.theme.CashioSemantic
-import java.util.Locale
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlin.math.abs
 
 /**
- * A compact, tappable card showing top-level Income + Expense metrics.
+ * A dashboard card that displays the high-level financial summary:
+ * Total Income vs Total Expenses, along with comparative deltas.
  *
- * Notes:
- * - "Delta" values should be positive/negative based on comparison vs previous period.
- * - Row tint stays consistent (Income=green, Expense=red),
- *   while delta color communicates direction (good/bad) based on context.
+ * @param totalIncome Current period's total income.
+ * @param totalExpenses Current period's total expenses.
+ * @param incomeDelta Difference in income compared to the previous period.
+ * @param expenseDelta Difference in expenses compared to the previous period.
+ * @param comparisonLabel Label explaining the delta (e.g., "last month").
+ * @param showChevron Whether to show navigation indicators.
  */
 @Composable
 fun FinancialSummaryCard(
@@ -71,7 +76,7 @@ fun FinancialSummaryCard(
     modifier: Modifier = Modifier
 ) {
     CashioCard(modifier = modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xs)) {
             MetricRow(
                 leadingIcon = ICON_INCOME,
                 label = LABEL_INCOME,
@@ -85,7 +90,7 @@ fun FinancialSummaryCard(
             )
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = CashioSpacing.small),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
@@ -121,6 +126,7 @@ private fun MetricRow(
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
 
+    // Subtle press animation for better tactile feel
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.985f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
@@ -129,9 +135,8 @@ private fun MetricRow(
 
     val rowTint = if (isIncomeRow) CashioSemantic.IncomeGreen else CashioSemantic.ExpenseRed
 
-    // Stabilize animations: convert to formatted strings (prevents animation spam from tiny float diffs)
     val amountText = remember(amount, currencySymbol) {
-        "$currencySymbol${formatCompactAmount(amount)}"
+        "$currencySymbol${CashioFormat.compactAmount(amount)}"
     }
     val deltaText = remember(delta, currencySymbol, comparisonLabel) {
         buildDeltaText(delta, currencySymbol, comparisonLabel)
@@ -141,22 +146,21 @@ private fun MetricRow(
         modifier = modifier
             .fillMaxWidth()
             .scale(scale)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(CashioRadius.small))
             .clickable(
                 interactionSource = interactionSource,
-                // keep ripple (default indication) so the row feels tappable
+                indication = null, // Custom ripple handled by parent if needed, or disable for cleaner look
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onClick()
                 }
             )
-            .padding(vertical = 8.dp),
+            .padding(vertical = CashioSpacing.small),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left side: Icon + label + delta
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -173,13 +177,14 @@ private fun MetricRow(
                 )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
+                // Animate text changes for delta
                 AnimatedContent(
                     targetState = deltaText,
                     transitionSpec = {
@@ -199,7 +204,7 @@ private fun MetricRow(
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.tiny)
                     ) {
                         if (delta != 0.0) {
                             Icon(
@@ -221,11 +226,11 @@ private fun MetricRow(
             }
         }
 
-        // Right side: amount + optional chevron
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.small),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Animate text changes for amount
             AnimatedContent(
                 targetState = amountText,
                 transitionSpec = {
@@ -256,19 +261,18 @@ private fun MetricRow(
 }
 
 /**
- * Delta text.
- * Keeps neutral copy simple and supports different comparisons: "last week", "last month", etc.
+ * Builds a readable string describing the change (e.g., "$500 less than last month").
  */
 private fun buildDeltaText(delta: Double, currencySymbol: String, comparisonLabel: String): String {
     if (delta == 0.0) return "Same as $comparisonLabel"
-    val amount = "$currencySymbol${formatCompactAmount(abs(delta))}"
+    val amount = "$currencySymbol${CashioFormat.compactAmount(abs(delta))}"
     return if (delta > 0) "$amount more than $comparisonLabel" else "$amount less than $comparisonLabel"
 }
 
 /**
- * Context-aware delta coloring:
- * - For Income: positive is good (green), negative is bad (red).
- * - For Expense: positive is bad (red), negative is good (green).
+ * Determines the color of the delta text based on context.
+ * - Income increasing is good (Green).
+ * - Expense increasing is bad (Red).
  */
 private fun deltaColor(
     delta: Double,
@@ -280,31 +284,6 @@ private fun deltaColor(
     delta > 0 -> if (isIncomeRow) income else expense
     delta < 0 -> if (isIncomeRow) expense else income
     else -> neutral
-}
-
-private fun formatCompactAmount(value: Double): String {
-    val v = abs(value)
-    return when {
-        v >= 1_000_000 -> {
-            val x = v / 1_000_000.0
-            if (x < 10) String.format(Locale.US, "%.1fM", x) else String.format(
-                Locale.US,
-                "%.0fM",
-                x
-            )
-        }
-
-        v >= 1_000 -> {
-            val x = v / 1_000.0
-            if (x < 10) String.format(Locale.US, "%.1fK", x) else String.format(
-                Locale.US,
-                "%.0fK",
-                x
-            )
-        }
-
-        else -> String.format(Locale.US, "%.0f", v)
-    }
 }
 
 private const val LABEL_INCOME = "Income"

@@ -1,5 +1,7 @@
 package com.bluemix.cashio.presentation.keyword
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -15,10 +17,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,14 +39,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluemix.cashio.R
 import com.bluemix.cashio.domain.model.Category
 import com.bluemix.cashio.presentation.common.UiState
-import com.bluemix.cashio.presentation.keywordmapping.KeywordMappingViewModel
+import com.bluemix.cashio.ui.components.cards.StateCard
+import com.bluemix.cashio.ui.components.cards.StateCardAction
+import com.bluemix.cashio.ui.components.cards.StateCardVariant
 import com.bluemix.cashio.ui.components.defaults.CashioTopBar
 import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
 import com.bluemix.cashio.ui.components.defaults.TopBarAction
 import com.bluemix.cashio.ui.components.defaults.TopBarIcon
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioRadius
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import org.koin.compose.viewmodel.koinViewModel
 import java.util.Locale
 
+/**
+ * Screen for managing Keyword Mappings (Auto-categorization rules).
+ *
+ * Allows users to:
+ * 1. Define keywords (e.g., "Starbucks", "Uber").
+ * 2. Assign a target Category (e.g., "Coffee", "Transport").
+ * 3. Set a priority level for conflict resolution.
+ *
+ * When rules are saved, the system automatically re-categorizes historic SMS transactions.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KeywordMappingScreen(
@@ -53,6 +71,7 @@ fun KeywordMappingScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // Efficiently map Category IDs to Objects for list display
     val categoriesById: Map<String, Category> by remember(state.categories) {
         derivedStateOf {
             (state.categories as? UiState.Success)?.data
@@ -61,11 +80,14 @@ fun KeywordMappingScreen(
         }
     }
 
+    // Client-side search filtering
     val filteredMappings by remember(state.mappings, state.query) {
         derivedStateOf {
             val all = (state.mappings as? UiState.Success)?.data.orEmpty()
             val q = state.query.trim().lowercase(Locale.ENGLISH)
-            if (q.isBlank()) all else all.filter { it.keyword.lowercase(Locale.ENGLISH).contains(q) }
+            if (q.isBlank()) all else all.filter {
+                it.keyword.lowercase(Locale.ENGLISH).contains(q)
+            }
         }
     }
 
@@ -77,11 +99,15 @@ fun KeywordMappingScreen(
                     icon = TopBarIcon.Vector(Icons.Default.Close),
                     onClick = onNavigateBack
                 ),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+                modifier = Modifier.padding(horizontal = CashioPadding.screen)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = viewModel::openAddSheet) {
+            FloatingActionButton(
+                onClick = { viewModel.openAddSheet() },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(CashioRadius.mediumSmall)
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Add mapping")
             }
         }
@@ -90,10 +116,11 @@ fun KeywordMappingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = CashioPadding.screen)
         ) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(CashioSpacing.medium))
 
+            // Search Bar
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
@@ -107,48 +134,50 @@ fun KeywordMappingScreen(
                 },
                 placeholder = { Text("Search keywords…") },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(CashioRadius.small)
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(CashioSpacing.medium))
 
+            // Content State
             when (val mappingsState = state.mappings) {
                 is UiState.Loading, UiState.Idle -> {
-                    androidx.compose.foundation.layout.Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator() }
+                    StateCard(variant = StateCardVariant.LOADING, animated = true)
                 }
 
                 is UiState.Error -> {
-                    EmptyOrErrorCard(
+                    StateCard(
+                        variant = StateCardVariant.ERROR,
                         title = "Couldn’t load mappings",
-                        subtitle = mappingsState.message,
-                        actionText = "Retry",
-                        onAction = viewModel::load
+                        message = mappingsState.message,
+                        action = StateCardAction("Retry", viewModel::load)
                     )
                 }
 
                 is UiState.Success -> {
                     if (filteredMappings.isEmpty()) {
                         val isSearchEmpty = state.query.isBlank()
-                        EmptyOrErrorCard(
+                        StateCard(
+                            variant = StateCardVariant.EMPTY,
+                            emoji = if (isSearchEmpty) "⌨️" else "🔍",
                             title = if (isSearchEmpty) "No mappings yet" else "No matches",
-                            subtitle = if (isSearchEmpty)
-                                "Add keywords like “swiggy”, “uber”, “amazon” to auto-categorize."
+                            message = if (isSearchEmpty)
+                                "Add keywords like “swiggy” or “uber” to auto-categorize SMS."
                             else
                                 "Try a different search term.",
-                            actionText = if (isSearchEmpty) "Add Mapping" else "Clear Search",
-                            onAction = {
-                                if (isSearchEmpty) viewModel.openAddSheet()
-                                else viewModel.onQueryChange("")
-                            }
+                            action = StateCardAction(
+                                text = if (isSearchEmpty) "Add Mapping" else "Clear Search",
+                                onClick = {
+                                    if (isSearchEmpty) viewModel.openAddSheet()
+                                    else viewModel.onQueryChange("")
+                                }
+                            )
                         )
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = 96.dp),
-                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+                            verticalArrangement = Arrangement.spacedBy(CashioSpacing.compact)
                         ) {
                             items(filteredMappings, key = { it.id }) { mapping ->
                                 MappingRow(
@@ -164,10 +193,18 @@ fun KeywordMappingScreen(
                     }
                 }
             }
+        }
 
+        // Overlay Banner for Operations (Success/Error feedback)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(CashioPadding.screen),
+            contentAlignment = Alignment.BottomCenter
+        ) {
             val bannerMessage = state.errorMessage ?: state.operationMessage
             if (bannerMessage != null) {
-                Spacer(Modifier.height(8.dp))
                 MessageBanner(
                     message = bannerMessage,
                     isError = state.errorMessage != null,
@@ -177,20 +214,27 @@ fun KeywordMappingScreen(
         }
     }
 
+    // --- Dialogs & Bottom Sheets ---
+
     state.confirmDelete?.let { target ->
         AlertDialog(
             onDismissRequest = viewModel::dismissDelete,
             title = { Text("Delete mapping?") },
-            text = { Text("Keyword “${target.keyword}” will stop auto-categorizing.") },
-            confirmButton = { TextButton(onClick = viewModel::deleteConfirmed) { Text("Delete") } },
+            text = { Text("Keyword “${target.keyword}” will stop auto-categorizing future expenses.") },
+            confirmButton = {
+                TextButton(onClick = viewModel::deleteConfirmed) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
             dismissButton = { TextButton(onClick = viewModel::dismissDelete) { Text("Cancel") } }
         )
     }
 
     if (state.isSheetOpen) {
-        androidx.compose.material3.ModalBottomSheet(
+        ModalBottomSheet(
             onDismissRequest = viewModel::closeSheet,
-            sheetState = sheetState
+            sheetState = sheetState,
+            shape = RoundedCornerShape(topStart = CashioRadius.large, topEnd = CashioRadius.large)
         ) {
             MappingEditorSheet(
                 state = state,

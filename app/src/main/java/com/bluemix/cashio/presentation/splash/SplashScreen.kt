@@ -3,6 +3,7 @@ package com.bluemix.cashio.presentation.splash
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,51 +20,51 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.delay
-import org.koin.compose.viewmodel.koinViewModel
-
-import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bluemix.cashio.ui.system.SystemBarsMatchTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SplashScreen(
     onFinished: () -> Unit,
     viewModel: SplashViewModel = koinViewModel()
 ) {
-    val ready by viewModel.isReady.collectAsStateWithLifecycle()
-
     val bg = MaterialTheme.colorScheme.background
     val darkIcons = bg.luminance() > 0.5f
 
-    // ✅ makes system bars match splash background
+    // ✅ Make status + nav bars match splash background
     SystemBarsMatchTheme(
         backgroundColorArgb = bg.toArgb(),
         darkIcons = darkIcons
     )
 
+    // Motion profile tuned for "soft + premium"
+    val splashSpring = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = 380f
+    )
+
     val alpha = remember { Animatable(0f) }
-    val scale = remember { Animatable(0.96f) } // slightly less bouncey start
+    val scale = remember { Animatable(0.97f) }
 
     LaunchedEffect(Unit) {
-        alpha.animateTo(1f, animationSpec = spring(dampingRatio = 0.85f))
-        scale.animateTo(1f, animationSpec = spring(dampingRatio = 0.85f))
+        // Start app init (VM already seeds + delays 1s)
+        viewModel.initApp(onFinished)
 
-        // wait for typewriter duration roughly
-        val text = "CASHIO"
-        val charDelay = 55L
-        delay(text.length * charDelay + 150)
-
-        onFinished()
+        // Visual intro
+        launch { alpha.animateTo(1f, animationSpec = splashSpring) }
+        launch { scale.animateTo(1f, animationSpec = splashSpring) }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(bg), // ✅ fills behind bars too
+            .background(bg),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -73,7 +74,11 @@ fun SplashScreen(
                 .alpha(alpha.value)
                 .scale(scale.value)
         ) {
-            TypewriterText(fullText = "CASHIO", charDelayMs = 55)
+            TypewriterText(
+                fullText = "CASHIO",
+                startDelayMs = 220,  // slight beat feels intentional
+                charDelayMs = 110
+            )
         }
     }
 }
@@ -81,16 +86,26 @@ fun SplashScreen(
 @Composable
 private fun TypewriterText(
     fullText: String,
-    charDelayMs: Long = 60,
+    startDelayMs: Long = 0,
+    charDelayMs: Long = 90,
     modifier: Modifier = Modifier
 ) {
     var visibleCount by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(fullText) {
         visibleCount = 0
+        if (startDelayMs > 0) delay(startDelayMs)
+
         for (i in 1..fullText.length) {
             visibleCount = i
-            delay(charDelayMs)
+
+            // micro-timing makes it feel less robotic
+            val d = when {
+                i == 1 -> charDelayMs + 70
+                i == fullText.length -> charDelayMs + 90
+                else -> charDelayMs
+            }
+            delay(d)
         }
     }
 
@@ -98,6 +113,7 @@ private fun TypewriterText(
         text = fullText.take(visibleCount),
         modifier = modifier,
         style = MaterialTheme.typography.displayLarge,
-        color = MaterialTheme.colorScheme.primary
+        color = MaterialTheme.colorScheme.primary,
+        letterSpacing = 1.5.sp
     )
 }

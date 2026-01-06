@@ -26,13 +26,6 @@ koin = "4.0.0"
 
 # Coroutines
 coroutines = "1.9.0"
-
-# Animations & UI Libraries
-lottie = "6.6.0"
-vicoCompose = "2.2.1"
-dateTimePickers = "0.9.0"
-meSaketSwipe = "1.3.0"
-colorpickerCompose = "1.1.2"
 composeCharts = "0.1.2"
 # Testing
 junit = "4.13.2"
@@ -77,14 +70,8 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 # Realm Database
 realm-kotlin = { group = "io.realm.kotlin", name = "library-base", version.ref = "realmKotlin" }
 
-
-
 # Charts & UI Enhancements
 ehsannarmani-compose-charts = { group = "io.github.ehsannarmani", name = "compose-charts", version.ref = "composeCharts" }
-compose-material3-datetime-pickers = { group = "com.marosseleng.android", name = "compose-material3-datetime-pickers", version.ref = "dateTimePickers" }
-me-saket-swipe = { group = "me.saket.swipe", name = "swipe", version.ref = "meSaketSwipe" }
-colorpicker-compose = { group = "com.github.skydoves", name = "colorpicker-compose", version.ref = "colorpickerCompose" }
-lottie = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
 
 # Koin
 koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
@@ -100,12 +87,10 @@ mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
-
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 realm-kotlin = { id = "io.realm.kotlin", version.ref = "realmKotlin" }
-ksp = { id = "com.google.devtools.ksp", version = "2.1.0-1.0.29" }
 jetbrains-kotlin-jvm= { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

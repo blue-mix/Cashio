@@ -39,7 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bluemix.cashio.presentation.analytics.vm.ChartPeriod
 import com.bluemix.cashio.ui.components.defaults.CashioCard
+import com.bluemix.cashio.ui.theme.CashioRadius
 import com.bluemix.cashio.ui.theme.CashioSemantic
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import ir.ehsannarmani.compose_charts.ColumnChart
 import ir.ehsannarmani.compose_charts.models.BarProperties
 import ir.ehsannarmani.compose_charts.models.Bars
@@ -49,9 +51,15 @@ import ir.ehsannarmani.compose_charts.models.HorizontalIndicatorProperties
 import ir.ehsannarmani.compose_charts.models.IndicatorPosition
 import ir.ehsannarmani.compose_charts.models.LabelHelperProperties
 import ir.ehsannarmani.compose_charts.models.LabelProperties
-import ir.ehsannarmani.compose_charts.models.LabelProperties.Rotation
 import ir.ehsannarmani.compose_charts.models.PopupProperties
 
+/**
+ * Immutable state holder for the Finance Chart.
+ *
+ * @property incomeData List of income values corresponding to each label.
+ * @property expenseData List of expense values corresponding to each label.
+ * @property labels X-axis labels (e.g., "Mon", "Tue" or "Week 1", "Week 2").
+ */
 @Immutable
 data class FinanceChartUi(
     val incomeData: List<Double>,
@@ -64,8 +72,17 @@ data class FinanceChartUi(
 }
 
 /**
- * Card displaying income vs expense chart with selectable period.
- * Uses semantic colors so charts remain consistent across the app.
+ * A card component displaying a comparative Column Chart (Income vs Expense).
+ *
+ * Features:
+ * - Period selection dropdown (controlled by [selectedPeriod]).
+ * - Adaptive bar sizing: Bar thickness and spacing adjust based on the number of data points.
+ * - Gradient styling for Income (Green) and Expense (Red) bars.
+ *
+ * @param chart The data to populate the chart.
+ * @param selectedPeriod The currently active time period filter.
+ * @param onPeriodChange Callback triggered when the user selects a different period.
+ * @param currencySymbol Symbol used in tooltips and axis labels (default: "₹").
  */
 @Composable
 fun FinanceStatsCard(
@@ -79,13 +96,13 @@ fun FinanceStatsCard(
 
     val labelCount = chart.labels.size
     val hasLabels = labelCount > 0
-
-    // Guard: avoid chart spam when all values are 0 (optional UX improvement)
     val hasAnyValue = remember(chart.incomeData, chart.expenseData) {
         (chart.incomeData.any { it != 0.0 } || chart.expenseData.any { it != 0.0 })
     }
 
-    // Adaptive bar sizing based on data density
+    // Adaptive sizing logic:
+    // Fewer items = thicker bars for better aesthetics.
+    // More items = thinner bars to fit within the viewport.
     val (barThickness, barSpacing, cornerRadius) = remember(labelCount) {
         Triple(
             when {
@@ -93,16 +110,15 @@ fun FinanceStatsCard(
                 labelCount <= 6 -> 12.dp
                 else -> 10.dp
             },
-            if (labelCount <= 6) 4.dp else 2.dp,
+            if (labelCount <= 6) CashioSpacing.xs else CashioSpacing.xxs,
             when {
-                labelCount <= 5 -> 12.dp
-                labelCount <= 6 -> 6.dp
+                labelCount <= 5 -> CashioRadius.small
+                labelCount <= 6 -> CashioRadius.xs
                 else -> 5.dp
             }
         )
     }
 
-    // Semantic gradients
     val expenseBrush = remember {
         Brush.verticalGradient(
             listOf(
@@ -111,7 +127,6 @@ fun FinanceStatsCard(
             )
         )
     }
-
     val incomeBrush = remember {
         Brush.verticalGradient(
             listOf(
@@ -121,7 +136,6 @@ fun FinanceStatsCard(
         )
     }
 
-    // Build bars safely even if lists mismatch
     val barGroups = remember(chart.labels, chart.incomeData, chart.expenseData) {
         val safeCount = chart.labels.size
         List(safeCount) { index ->
@@ -143,9 +157,7 @@ fun FinanceStatsCard(
         }
     }
 
-    CashioCard(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    CashioCard(modifier = modifier.fillMaxWidth()) {
         Column {
             HeaderRow(
                 selectedPeriod = selectedPeriod,
@@ -157,7 +169,7 @@ fun FinanceStatsCard(
                 }
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(CashioSpacing.huge))
 
             if (!hasLabels || !hasAnyValue) {
                 Text(
@@ -175,10 +187,10 @@ fun FinanceStatsCard(
                 data = barGroups,
                 barProperties = BarProperties(
                     cornerRadius = Bars.Data.Radius.Rectangle(
-                        topLeft = cornerRadius,
-                        topRight = cornerRadius,
-                        bottomLeft = cornerRadius,
-                        bottomRight = cornerRadius
+                        cornerRadius,
+                        cornerRadius,
+                        cornerRadius,
+                        cornerRadius
                     ),
                     spacing = barSpacing,
                     thickness = barThickness
@@ -191,7 +203,7 @@ fun FinanceStatsCard(
                         fontSize = 11.sp,
                         fontFamily = MaterialTheme.typography.labelSmall.fontFamily
                     ),
-                    padding = 8.dp,
+                    padding = CashioSpacing.small,
                     position = IndicatorPosition.Horizontal.Start,
                     contentBuilder = { "$currencySymbol${it.toInt()}" }
                 ),
@@ -199,11 +211,11 @@ fun FinanceStatsCard(
                     enabled = true,
                     textStyle = TextStyle(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontFamily = MaterialTheme.typography.labelSmall.fontFamily
                     ),
-                    padding = 12.dp,
-                    rotation = Rotation(degree = 0f)
+                    padding = CashioSpacing.medium,
+                    rotation = LabelProperties.Rotation(degree = 0f)
                 ),
                 dividerProperties = DividerProperties(enabled = false),
                 gridProperties = GridProperties(
@@ -214,7 +226,7 @@ fun FinanceStatsCard(
                     enabled = true,
                     textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
                     containerColor = MaterialTheme.colorScheme.inverseSurface,
-                    cornerRadius = 6.dp,
+                    cornerRadius = CashioRadius.xs,
                     contentBuilder = { "$currencySymbol${it.toInt()}" }
                 )
             )
@@ -258,26 +270,24 @@ private fun PeriodDropdown(
     Box {
         OutlinedButton(
             onClick = { onExpandedChange(true) },
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(CashioRadius.pill),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onSurface
             ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+            contentPadding = PaddingValues(
+                horizontal = CashioSpacing.default,
+                vertical = CashioSpacing.small
+            ),
             modifier = Modifier.height(40.dp)
         ) {
-            Text(
-                text = selected.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+            Text(text = selected.label, style = MaterialTheme.typography.labelLarge)
+            Spacer(modifier = Modifier.width(CashioSpacing.xs))
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
-                contentDescription = "Select period",
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurface
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
             )
         }
 
@@ -292,11 +302,7 @@ private fun PeriodDropdown(
                         Text(
                             text = period.label,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (period == selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            }
+                            color = if (period == selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     },
                     onClick = { onSelect(period) },
@@ -317,12 +323,9 @@ private fun PeriodDropdown(
 }
 
 @Composable
-private fun Legend(
-    incomeColor: Color,
-    expenseColor: Color
-) {
+private fun Legend(incomeColor: Color, expenseColor: Color) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.default),
         verticalAlignment = Alignment.CenterVertically
     ) {
         LegendItem(color = incomeColor, label = SERIES_INCOME)
@@ -333,7 +336,7 @@ private fun Legend(
 @Composable
 private fun LegendItem(color: Color, label: String) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.tiny),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(

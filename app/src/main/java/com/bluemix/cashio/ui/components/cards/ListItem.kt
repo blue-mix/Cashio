@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,27 +19,42 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bluemix.cashio.R
+import com.bluemix.cashio.core.format.CashioFormat
+import com.bluemix.cashio.core.format.CashioFormat.toDateLabel
+import com.bluemix.cashio.core.format.CashioFormat.toTimeLabel
 import com.bluemix.cashio.domain.model.TransactionType
 import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.theme.CashioSemantic
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.absoluteValue
 
 /**
- * A reusable transaction row card used across screens (history, dashboard, lists).
+ * A standard list item representing a single financial transaction.
  *
- * Design rules:
- * - Uses [CashioCard] as the ONE consistent container.
- * - Optional compact styling is applied inside the card (subtle surfaceVariant tint).
- * - Amount color is semantic: income = green, expense = red.
+ * This component automatically handles:
+ * - Formatting the amount with the currency symbol.
+ * - Applying Semantic colors (Red for Expense, Green for Income).
+ * - Formatting the date and time strings.
+ * - Adjusting layout density via the [compact] parameter.
+ *
+ * @param title The primary text (Merchant name or Description).
+ * @param amount The raw transaction amount.
+ * @param type Determines if this is [TransactionType.INCOME] or [TransactionType.EXPENSE].
+ * @param dateTime The timestamp of the transaction.
+ * @param categoryIcon The emoji or character representing the category.
+ * @param categoryColor The background tint color for the category icon.
+ * @param showCategoryIcon Whether to display the leading circular icon.
+ * @param showChevron Whether to display the trailing arrow icon indicating navigation.
+ * @param showDate Whether to display the secondary text line with date/time.
+ * @param compact If true, reduces padding and font sizes for dense lists (e.g., Dashboard).
+ * @param currencySymbol The symbol to prefix the amount with (default "₹").
+ * @param onClick Callback when the item is tapped.
  */
 @Composable
 fun TransactionListItem(
@@ -58,7 +72,6 @@ fun TransactionListItem(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // UI sizing tokens
     val iconSize = if (compact) 40.dp else 48.dp
     val emojiFontSize = if (compact) 20.sp else 24.sp
 
@@ -67,23 +80,19 @@ fun TransactionListItem(
         TransactionType.INCOME -> CashioSemantic.IncomeGreen
     }
 
-    val normalizedAmount = amount.absoluteValue
-
-    // Keep formatting stable and cheap
-    val formattedAmount = remember(normalizedAmount, currencySymbol) {
-        "%s%,.2f".format(Locale.ENGLISH, currencySymbol, normalizedAmount)
+    val formattedAmount = remember(amount, currencySymbol) {
+        CashioFormat.money(amount.absoluteValue, currencySymbol)
     }
 
     val signedAmountText = remember(type, formattedAmount) {
-        when (type) {
-            TransactionType.EXPENSE -> "-$formattedAmount"
-            TransactionType.INCOME -> "+$formattedAmount"
-        }
+        if (type == TransactionType.EXPENSE) "-$formattedAmount" else "+$formattedAmount"
     }
 
-    val now = remember { LocalDateTime.now() }
-    val dateText = remember(dateTime, now) { formatTransactionDate(dateTime, now) }
-
+    val dateText = remember(dateTime) {
+        val datePart = dateTime.toDateLabel()
+        val timePart = dateTime.toTimeLabel()
+        "$datePart • $timePart"
+    }
 
     CashioCard(
         modifier = modifier.fillMaxWidth(),
@@ -93,10 +102,9 @@ fun TransactionListItem(
         else
             MaterialTheme.colorScheme.surface
     ) {
-
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (showCategoryIcon) {
@@ -110,7 +118,7 @@ fun TransactionListItem(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)
             ) {
                 Text(
                     text = title,
@@ -118,7 +126,6 @@ fun TransactionListItem(
                     else MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
-
                 )
 
                 if (showDate) {
@@ -155,8 +162,7 @@ fun TransactionListItem(
 }
 
 /**
- * Icon chip used in transaction rows.
- * If you move from emoji to vector icons later, update only this function.
+ * A private helper composable to render the circular category icon.
  */
 @Composable
 private fun CategoryIconChip(
@@ -178,39 +184,3 @@ private fun CategoryIconChip(
         )
     }
 }
-
-/**
- * Human readable timestamps:
- * - Today, 13:20
- * - Yesterday, 09:12
- * - 12 Dec, 18:40 (same year)
- * - 12 Dec 2024 (different year)
- */
-private fun formatTransactionDate(
-    dateTime: LocalDateTime,
-    now: LocalDateTime = LocalDateTime.now()
-): String {
-    val today = now.toLocalDate()
-    val yesterday = today.minusDays(1)
-    val txDate = dateTime.toLocalDate()
-
-    return when {
-        txDate == today ->
-            "Today, ${dateTime.format(TIME_FMT)}"
-
-        txDate == yesterday ->
-            "Yesterday, ${dateTime.format(TIME_FMT)}"
-
-        txDate.year == today.year ->
-            dateTime.format(DATE_TIME_SAME_YEAR_FMT)
-
-        else ->
-            dateTime.format(DATE_FULL_YEAR_FMT)
-    }
-}
-
-private val TIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
-private val DATE_TIME_SAME_YEAR_FMT: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("dd MMM, HH:mm", Locale.ENGLISH)
-private val DATE_FULL_YEAR_FMT: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)

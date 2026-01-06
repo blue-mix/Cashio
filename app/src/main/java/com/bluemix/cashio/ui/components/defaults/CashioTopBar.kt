@@ -2,12 +2,12 @@ package com.bluemix.cashio.ui.components.defaults
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,16 +24,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bluemix.cashio.core.format.CashioFormat.toTopBarLabel
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
- * Standardized top bar for Cashio screens.
+ * The standard Top Application Bar for Cashio screens.
  *
- * Updated:
- * - TopBarAction now supports both ImageVector + drawable via TopBarIcon.
- * - Date icon is also customizable (drawable or vector).
+ * This composable wraps Material 3's [CenterAlignedTopAppBar] to provide
+ * consistent styling across the app, including:
+ * - "Pill" shaped action buttons with tonal backgrounds.
+ * - Support for standard text titles or specialized Date selector titles.
+ * - Automatic integration with the app's theme colors.
+ *
+ * @param title The content to display in the center (Text or Date).
+ * @param modifier Modifier for the top bar layout.
+ * @param leadingAction Optional configuration for the start-aligned button (e.g., Back, Menu).
+ * @param trailingAction Optional configuration for the end-aligned button (e.g., Edit, Settings).
+ * @param containerColor Background color of the bar. Defaults to transparent for edge-to-edge designs.
+ * @param contentColor Color for icons and text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,11 +64,13 @@ fun CashioTopBar(
         ),
         navigationIcon = {
             leadingAction?.let { action ->
-                TopBarIconPill(
-                    icon = action.icon,
-                    onClick = action.onClick,
-                    enabled = action.enabled
-                )
+                Box(modifier = Modifier.padding(start = CashioSpacing.small)) {
+                    TopBarIconPill(
+                        icon = action.icon,
+                        onClick = action.onClick,
+                        enabled = action.enabled
+                    )
+                }
             }
         },
         title = {
@@ -84,43 +95,54 @@ fun CashioTopBar(
         },
         actions = {
             trailingAction?.let { action ->
-                TopBarIconPill(
-                    icon = action.icon,
-                    onClick = action.onClick,
-                    enabled = action.enabled
-                )
+                Box(modifier = Modifier.padding(end = CashioSpacing.small)) {
+                    TopBarIconPill(
+                        icon = action.icon,
+                        onClick = action.onClick,
+                        enabled = action.enabled
+                    )
+                }
             }
         }
     )
 }
 
 /* -------------------------------------------------------------------------- */
-/* Models                                                                      */
+/* Models                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Defines the content style for the Top Bar's title area.
+ */
 sealed interface CashioTopBarTitle {
+    /** A simple static text title. */
     data class Text(val text: String) : CashioTopBarTitle
 
-    /**
-     * Provide icon here so you can swap calendar icon to your drawable.
-     */
+    /** A dynamic title displaying a date, often used for dashboards or reports. */
     data class Date(
         val date: LocalDate = LocalDate.now(),
         val icon: TopBarIcon = TopBarIcon.Drawable(
-            // ✅ Replace with your calendar drawable
             resId = com.bluemix.cashio.R.drawable.calendar
         )
     ) : CashioTopBarTitle
 }
 
 /**
- * Allow both vector + drawable.
+ * Icon wrapper specific to Top Bar actions.
+ * Abstraction to support both Vector and Drawable resources.
  */
 sealed interface TopBarIcon {
     data class Vector(val imageVector: ImageVector) : TopBarIcon
     data class Drawable(@DrawableRes val resId: Int) : TopBarIcon
 }
 
+/**
+ * Configuration for an interactive button within the Top Bar.
+ *
+ * @param icon The visual icon to display.
+ * @param onClick Lambda invoked when the button is tapped.
+ * @param enabled Whether the button accepts user input.
+ */
 data class TopBarAction(
     val icon: TopBarIcon,
     val onClick: () -> Unit,
@@ -128,19 +150,21 @@ data class TopBarAction(
 )
 
 /* -------------------------------------------------------------------------- */
-/* UI building blocks                                                          */
+/* Internal UI Building Blocks                                                */
 /* -------------------------------------------------------------------------- */
 
 private object CashioTopBarDefaults {
     val IconSize = 24.dp
-    val IconPadding = 8.dp
+    val IconPadding = CashioSpacing.small
     val IconTonalElevation = 2.dp
     val IconShadowElevation = 2.dp
     const val IconSurfaceAlpha = 0.96f
-    val ButtonSize=40.dp
-    val DatePillRadius = 999.dp
-    val DatePillPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-    val DateIconSpacing = 8.dp
+    val ButtonSize = 40.dp
+    val DatePillPadding = PaddingValues(
+        horizontal = CashioSpacing.medium,
+        vertical = CashioSpacing.tiny
+    )
+    val DateIconSpacing = CashioSpacing.small
 }
 
 @Composable
@@ -158,15 +182,17 @@ private fun TopBarIconPill(
         onClick = onClick,
         enabled = enabled
     ) {
+        val iconModifier = Modifier
+            .size(CashioTopBarDefaults.IconSize)
+            .padding(CashioTopBarDefaults.IconPadding)
+
         when (icon) {
             is TopBarIcon.Vector -> {
                 Icon(
                     imageVector = icon.imageVector,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size(CashioTopBarDefaults.IconSize)
-                        .padding(CashioTopBarDefaults.IconPadding)
+                    modifier = iconModifier
                 )
             }
 
@@ -175,9 +201,7 @@ private fun TopBarIconPill(
                     painter = painterResource(id = icon.resId),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size(CashioTopBarDefaults.IconSize)
-                        .padding(CashioTopBarDefaults.IconPadding)
+                    modifier = iconModifier
                 )
             }
         }
@@ -192,46 +216,39 @@ private fun DateTitle(
 ) {
     val dateText = remember(date) { date.toTopBarLabel() }
 
+    Row(
+        modifier = Modifier.padding(CashioTopBarDefaults.DatePillPadding),
+        horizontalArrangement = Arrangement.spacedBy(CashioTopBarDefaults.DateIconSpacing),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val iconModifier = Modifier.size(CashioTopBarDefaults.IconSize)
+        val iconTint = MaterialTheme.colorScheme.primary
 
-        Row(
-            modifier = Modifier.padding(CashioTopBarDefaults.DatePillPadding),
-            horizontalArrangement = Arrangement.spacedBy(CashioTopBarDefaults.DateIconSpacing),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            when (icon) {
-                is TopBarIcon.Vector -> {
-                    Icon(
-                        imageVector = icon.imageVector,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                is TopBarIcon.Drawable -> {
-                    Icon(
-                        painter = painterResource(icon.resId),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+        when (icon) {
+            is TopBarIcon.Vector -> {
+                Icon(
+                    imageVector = icon.imageVector,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = iconModifier
+                )
             }
 
-            Text(
-                text = dateText,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = contentColor
-            )
+            is TopBarIcon.Drawable -> {
+                Icon(
+                    painter = painterResource(icon.resId),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = iconModifier
+                )
+            }
         }
+
+        Text(
+            text = dateText,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor
+        )
     }
-
-
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                     */
-/* -------------------------------------------------------------------------- */
-
-private fun LocalDate.toTopBarLabel(): String {
-    val formatter = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH)
-    return format(formatter)
 }

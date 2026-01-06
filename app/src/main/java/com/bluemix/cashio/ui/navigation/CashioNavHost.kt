@@ -47,30 +47,47 @@ import com.bluemix.cashio.R
 import com.bluemix.cashio.presentation.add.AddExpenseScreen
 import com.bluemix.cashio.presentation.analytics.ui.AnalyticsScreen
 import com.bluemix.cashio.presentation.categories.CategoriesScreen
-import com.bluemix.cashio.presentation.common.PlaceholderScreen
 import com.bluemix.cashio.presentation.history.HistoryScreen
 import com.bluemix.cashio.presentation.home.DashboardScreen
 import com.bluemix.cashio.presentation.keyword.KeywordMappingScreen
+import com.bluemix.cashio.presentation.onboarding.OnboardingScreen
 import com.bluemix.cashio.presentation.settings.ui.SettingsScreen
 import com.bluemix.cashio.presentation.splash.SplashScreen
 import com.bluemix.cashio.presentation.transaction.TransactionDetailsScreen
 import com.bluemix.cashio.presentation.transaction.TransactionsScreen
 
+/**
+ * Constants for the Navigation UI layout and animations.
+ * Centralized here to ensure the FAB overlap and bottom bar gap calculation stay in sync.
+ */
 private object NavUi {
     val FabSize = 56.dp
-    val FabOverlapOffset = 45.dp
-    val FabGapWidth = FabSize
+    val FabOverlapOffset = 45.dp // How much the FAB "floats" above the bar
+    val FabGapWidth = FabSize // The physical gap in the bottom bar items
     val BottomBarShape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp)
     const val BottomBarAnimMs = 300
     const val FabAnimMs = 200
 }
 
+/**
+ * The Root Navigation Graph container.
+ *
+ * This composable manages:
+ * 1. The Global [Scaffold] (Bottom Bar, FAB).
+ * 2. Visibility animations for system UI elements based on the current route.
+ * 3. The Navigation Graph definition.
+ *
+ * @param startDestination The initial screen to show (Splash for returning users, Onboarding for new ones).
+ */
 @Composable
-fun CashioNavHost() {
+fun CashioNavHost(
+    startDestination: Route
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
 
+    // Determine if we should show the persistent UI elements
     val showBottomBar = currentDestination.shouldShowBottomBar()
     val showFab = currentDestination.shouldShowFab()
 
@@ -102,7 +119,7 @@ fun CashioNavHost() {
     )
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0),
+        contentWindowInsets = WindowInsets(0), // Handled by individual screens for edge-to-edge
         bottomBar = {
             AnimatedVisibility(
                 visible = showBottomBar,
@@ -128,7 +145,6 @@ fun CashioNavHost() {
                         slideInVertically { it / 2 },
                 exit = fadeOut(tween(NavUi.FabAnimMs)) +
                         slideOutVertically { it / 2 }
-
             ) {
                 FloatingActionButton(
                     onClick = {
@@ -139,6 +155,7 @@ fun CashioNavHost() {
                     shape = CircleShape,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
+                    // Offset moves FAB down to create the "docked" look
                     modifier = Modifier
                         .size(NavUi.FabSize)
                         .offset(y = NavUi.FabOverlapOffset)
@@ -156,12 +173,15 @@ fun CashioNavHost() {
         ) {
             NavHost(
                 navController = navController,
-                startDestination = Route.Onboarding
+                startDestination = startDestination
             ) {
+
+                // --- Startup Flow ---
+
                 composable<Route.Onboarding> {
-                    PlaceholderScreen(
-                        title = "Onboarding",
+                    OnboardingScreen(
                         onNavigate = {
+                            // Navigate to Dashboard and wipe backstack so user can't go back to onboarding
                             navController.navigate(Route.Dashboard) {
                                 popUpTo(Route.Onboarding) { inclusive = true }
                                 launchSingleTop = true
@@ -169,6 +189,19 @@ fun CashioNavHost() {
                         }
                     )
                 }
+
+                composable<Route.Splash> {
+                    SplashScreen(
+                        onFinished = {
+                            navController.navigate(Route.Dashboard) {
+                                popUpTo(Route.Splash) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
+
+                // --- Main Tabs ---
 
                 composable<Route.Dashboard> {
                     DashboardScreen(
@@ -179,6 +212,28 @@ fun CashioNavHost() {
                         }
                     )
                 }
+
+                composable<Route.History> {
+                    HistoryScreen(
+                        onTransactionClick = { id ->
+                            navController.navigate(Route.TransactionDetails(id))
+                        }
+                    )
+                }
+
+                composable<Route.Analytics> {
+                    AnalyticsScreen()
+                }
+
+                composable<Route.Settings> {
+                    SettingsScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToKeywordMapping = { navController.navigate(Route.KeywordMapping) },
+                        onNavigateToCategories = { navController.navigate(Route.Categories) }
+                    )
+                }
+
+                // --- Feature Screens ---
 
                 composable<Route.Transactions> {
                     TransactionsScreen(
@@ -200,14 +255,6 @@ fun CashioNavHost() {
                     )
                 }
 
-                composable<Route.History> {
-                    HistoryScreen(
-                        onTransactionClick = { id ->
-                            navController.navigate(Route.TransactionDetails(id))
-                        }
-                    )
-                }
-
                 composable<Route.AddExpense> { entry ->
                     val route = entry.toRoute<Route.AddExpense>()
                     AddExpenseScreen(
@@ -221,38 +268,18 @@ fun CashioNavHost() {
                     CategoriesScreen(onNavigateBack = { navController.popBackStack() })
                 }
 
-                composable<Route.Analytics> {
-                    AnalyticsScreen()
-                }
-
-                composable<Route.Settings> {
-                    SettingsScreen(
-                        onNavigateBack = { navController.popBackStack() },
-                        onNavigateToKeywordMapping = { navController.navigate(Route.KeywordMapping) },
-                        onNavigateToCategories = { navController.navigate(Route.Categories) }
-                    )
-                }
-
                 composable<Route.KeywordMapping> {
                     KeywordMappingScreen(onNavigateBack = { navController.popBackStack() })
                 }
-
-                composable<Route.Splash> {
-                    SplashScreen(
-                        onFinished = {
-                            navController.navigate(Route.Dashboard) {
-                                popUpTo(Route.Splash) { inclusive = true }
-                                launchSingleTop = true
-                            }
-                        }
-                    )
-                }
-
             }
         }
     }
 }
 
+/**
+ * A helper to render our unified [NavIcon] abstraction.
+ * Supports both Vector (Material Icons) and Drawable resources.
+ */
 @Composable
 private fun NavIconSlot(
     icon: NavIcon,
@@ -274,7 +301,8 @@ private fun NavIconSlot(
 }
 
 /**
- * Bottom bar that leaves a center gap under the FAB.
+ * Custom Bottom Bar implementation that splits the items into two groups
+ * and inserts a Spacer in the middle to create room for the FAB.
  */
 @Composable
 private fun BottomBarWithFabGap(
@@ -283,7 +311,6 @@ private fun BottomBarWithFabGap(
 ) {
     Surface(
         shape = NavUi.BottomBarShape,
-        // tonalElevation = 12.dp,
         shadowElevation = 12.dp,
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth()
@@ -292,38 +319,33 @@ private fun BottomBarWithFabGap(
             containerColor = Color.Transparent,
             tonalElevation = 0.dp
         ) {
+            // Render first 2 items
             items.take(2).forEach { item ->
                 val isSelected = navController.currentDestinationMatches(item.route)
                 val icon = if (isSelected) item.selectedIcon else item.unselectedIcon
                 NavigationBarItem(
                     selected = isSelected,
-                    onClick = { navController.navigateBottom(item.route) }
-,
-                            icon = {
-                        NavIconSlot(
-                            icon = icon,
-                            contentDescription = item.title
-                        )
+                    onClick = { navController.navigateBottom(item.route) },
+                    icon = {
+                        NavIconSlot(icon = icon, contentDescription = item.title)
                     },
                     label = { Text(item.title) },
                     colors = navItemColors()
                 )
             }
 
+            // The invisible gap for the FAB
             Spacer(modifier = Modifier.width(NavUi.FabGapWidth))
 
+            // Render last 2 items
             items.takeLast(2).forEach { item ->
                 val isSelected = navController.currentDestinationMatches(item.route)
                 val icon = if (isSelected) item.selectedIcon else item.unselectedIcon
                 NavigationBarItem(
                     selected = isSelected,
-                    onClick = { navController.navigateBottom(item.route) }
-,
-                            icon = {
-                        NavIconSlot(
-                            icon = icon,
-                            contentDescription = item.title
-                        )
+                    onClick = { navController.navigateBottom(item.route) },
+                    icon = {
+                        NavIconSlot(icon = icon, contentDescription = item.title)
                     },
                     label = { Text(item.title) },
                     colors = navItemColors()
@@ -332,9 +354,18 @@ private fun BottomBarWithFabGap(
         }
     }
 }
+
+/**
+ * Standard Bottom Navigation logic:
+ * 1. Pop up to the start destination (Dashboard) to avoid stacking back entries.
+ * 2. Use [launchSingleTop] to prevent multiple copies of the same screen.
+ * 3. Restore state when switching back to a tab.
+ */
 private fun NavHostController.navigateBottom(route: Route) {
     navigate(route) {
-        popUpTo(Route.Dashboard) { saveState = true }
+        popUpTo(Route.Dashboard) {
+            saveState = true
+        }
         launchSingleTop = true
         restoreState = true
     }
@@ -350,10 +381,11 @@ private fun navItemColors() = NavigationBarItemDefaults.colors(
 )
 
 /**
- * Centralized route matching.
+ * Type-Safe Route Matching.
  *
- * For typed routes, the destination.route is typically the qualified name of the route class.
- * This keeps logic in one place, so if you change navigation libraries you only update this.
+ * Compares the fully qualified class name of the [Route] object against
+ * the current destination's route in the backstack.
+ * This is required because Navigation Compose serializes Routes to strings internally.
  */
 private fun NavHostController.currentDestinationMatches(route: Route): Boolean {
     val target = route::class.qualifiedName ?: return false
@@ -362,8 +394,7 @@ private fun NavHostController.currentDestinationMatches(route: Route): Boolean {
 }
 
 /**
- * Visibility policy for bottom bar / FAB.
- * Keep this close to navigation, not scattered across screens.
+ * Defines which destinations should display the Bottom Bar and FAB.
  */
 private val MAIN_DESTINATIONS = setOf(
     Route.Dashboard::class.qualifiedName,

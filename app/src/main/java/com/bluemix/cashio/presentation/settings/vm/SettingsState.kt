@@ -14,6 +14,8 @@ data class SettingsState(
 )
 
 sealed class SettingsMessage {
-    data class Success(val text: String) : SettingsMessage()
-    data class Error(val text: String) : SettingsMessage()
+    abstract val text: String
+
+    data class Success(override val text: String) : SettingsMessage()
+    data class Error(override val text: String) : SettingsMessage()
 }

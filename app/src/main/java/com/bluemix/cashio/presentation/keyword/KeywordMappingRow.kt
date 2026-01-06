@@ -2,7 +2,6 @@ package com.bluemix.cashio.presentation.keyword
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +20,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.ui.components.defaults.CashioCard
+import com.bluemix.cashio.ui.theme.CashioShapes
+import com.bluemix.cashio.ui.theme.CashioSpacing
 
+/**
+ * A list item representing a single keyword mapping rule.
+ *
+ * Displays the keyword, its target category, and priority level.
+ * Includes actions to Edit or Delete the rule.
+ *
+ * @param keyword The trigger keyword string.
+ * @param categoryLabel The name of the category this keyword maps to.
+ * @param priority The resolution priority (1-10).
+ * @param onEdit Callback when the edit action is triggered.
+ * @param onDelete Callback when the delete action is triggered.
+ */
 @Composable
 fun MappingRow(
     keyword: String,
@@ -33,22 +46,22 @@ fun MappingRow(
     CashioCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onEdit,
-        padding = PaddingValues(14.dp),
-        cornerRadius = 16.dp,
+        cornerRadius = CashioShapes.card,
         showBorder = true
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium)
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    keyword,
+                    text = keyword,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(CashioSpacing.xxs)) // 2dp
                 Text(
                     text = "Category: $categoryLabel  •  Priority: $priority",
                     style = MaterialTheme.typography.bodySmall,
@@ -62,14 +75,16 @@ fun MappingRow(
                 Icon(
                     painter = painterResource(R.drawable.edit),
                     contentDescription = "Edit",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     painter = painterResource(R.drawable.delete),
                     contentDescription = "Delete",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
         }

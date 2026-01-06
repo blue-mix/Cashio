@@ -1,4 +1,4 @@
-package com.bluemix.cashio.presentation.keywordmapping
+package com.bluemix.cashio.presentation.keyword
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -14,6 +14,7 @@ import com.bluemix.cashio.domain.usecase.keyword.GetKeywordMappingsUseCase
 import com.bluemix.cashio.domain.usecase.keyword.UpdateKeywordMappingUseCase
 import com.bluemix.cashio.presentation.common.UiState
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,26 +22,44 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+/**
+ * State for the Keyword Mapping screen.
+ *
+ * @property query Search filter for the mapping list.
+ * @property mappings The list of active keyword rules.
+ * @property categories Available categories for the picker.
+ * @property isSheetOpen True if the Add/Edit bottom sheet is visible.
+ * @property isEditMode True if we are editing an existing rule, False if creating new.
+ */
 data class KeywordMappingState(
+    // Data Lists
     val query: String = "",
     val mappings: UiState<List<KeywordMapping>> = UiState.Idle,
     val categories: UiState<List<Category>> = UiState.Idle,
 
+    // Sheet / Editor State
     val isSheetOpen: Boolean = false,
     val isEditMode: Boolean = false,
     val editing: KeywordMapping? = null,
-
     val keyword: String = "",
     val categoryId: String = "",
     val priority: Int = 5,
 
+    // Operations
     val confirmDelete: KeywordMapping? = null,
-
     val isSaving: Boolean = false,
     val operationMessage: String? = null,
     val errorMessage: String? = null
 )
 
+/**
+ * ViewModel managing the Keyword Mapping feature.
+ *
+ * This VM handles:
+ * 1. CRUD operations for Keyword Mappings.
+ * 2. Automatic **Recategorization** of past expenses when rules change.
+ * 3. UI state for the list, search, and edit/create bottom sheet.
+ */
 class KeywordMappingViewModel(
     private val getKeywordMappings: GetKeywordMappingsUseCase,
     private val addKeywordMapping: AddKeywordMappingUseCase,
@@ -61,41 +80,59 @@ class KeywordMappingViewModel(
         load()
     }
 
+    /**
+     * Loads both the mappings list and the category list in parallel.
+     */
     fun load() {
         viewModelScope.launch {
-            _state.update { it.copy(mappings = UiState.Loading, categories = UiState.Loading) }
+            updateState { it.copy(mappings = UiState.Loading, categories = UiState.Loading) }
 
-            val mappingsDeferred = async { getKeywordMappings() }
-            val categoriesDeferred = async { getCategories() }
+            try {
+                coroutineScope {
+                    val mappingsDeferred = async { getKeywordMappings() }
+                    val categoriesDeferred = async { getCategories() }
 
-            when (val res = mappingsDeferred.await()) {
-                is Result.Success -> _state.update { it.copy(mappings = UiState.Success(res.data)) }
-                is Result.Error -> _state.update {
-                    it.copy(mappings = UiState.Error(res.message ?: "Failed to load mappings"))
+                    val mappingsRes = mappingsDeferred.await()
+                    val categoriesRes = categoriesDeferred.await()
+
+                    updateState { current ->
+                        current.copy(
+                            mappings = when (mappingsRes) {
+                                is Result.Success -> UiState.Success(mappingsRes.data)
+                                is Result.Error -> UiState.Error(
+                                    mappingsRes.message ?: "Failed to load mappings"
+                                )
+
+                                else -> UiState.Idle
+                            },
+                            categories = when (categoriesRes) {
+                                is Result.Success -> UiState.Success(categoriesRes.data)
+                                is Result.Error -> UiState.Error(
+                                    categoriesRes.message ?: "Failed to load categories"
+                                )
+
+                                else -> UiState.Idle
+                            }
+                        )
+                    }
                 }
-
-                else -> Unit
-            }
-
-            when (val res = categoriesDeferred.await()) {
-                is Result.Success -> _state.update { it.copy(categories = UiState.Success(res.data)) }
-                is Result.Error -> _state.update {
-                    it.copy(categories = UiState.Error(res.message ?: "Failed to load categories"))
-                }
-
-                else -> Unit
+            } catch (e: Exception) {
+                updateState { it.copy(mappings = UiState.Error(e.message ?: "Unknown error")) }
             }
         }
     }
 
-    fun onQueryChange(query: String) = _state.update { it.copy(query = query) }
+    /* ------------------------- UI Actions ------------------------- */
+
+    fun onQueryChange(query: String) = updateState { it.copy(query = query) }
 
     fun openAddSheet(defaultCategoryId: String? = null) {
+        // Default to provided category, OR first available, OR whatever was last selected
         val categoryId = defaultCategoryId
-            ?: (_state.value.categories as? UiState.Success)?.data?.firstOrNull()?.id
-            ?: _state.value.categoryId
+            ?: (state.value.categories as? UiState.Success)?.data?.firstOrNull()?.id
+            ?: state.value.categoryId
 
-        _state.update {
+        updateState {
             it.copy(
                 isSheetOpen = true,
                 isEditMode = false,
@@ -111,7 +148,7 @@ class KeywordMappingViewModel(
     }
 
     fun openEditSheet(mapping: KeywordMapping) {
-        _state.update {
+        updateState {
             it.copy(
                 isSheetOpen = true,
                 isEditMode = true,
@@ -127,31 +164,32 @@ class KeywordMappingViewModel(
     }
 
     fun closeSheet() =
-        _state.update { it.copy(isSheetOpen = false, errorMessage = null, isSaving = false) }
+        updateState { it.copy(isSheetOpen = false, errorMessage = null, isSaving = false) }
 
-    fun setKeyword(value: String) = _state.update { it.copy(keyword = value) }
-    fun setCategoryId(value: String) = _state.update { it.copy(categoryId = value) }
-    fun setPriority(value: Int) = _state.update { it.copy(priority = value.coerceIn(1, 10)) }
+    fun setKeyword(value: String) = updateState { it.copy(keyword = value) }
+    fun setCategoryId(value: String) = updateState { it.copy(categoryId = value) }
+    fun setPriority(value: Int) = updateState { it.copy(priority = value.coerceIn(1, 10)) }
 
-    fun requestDelete(mapping: KeywordMapping) = _state.update { it.copy(confirmDelete = mapping) }
-    fun dismissDelete() = _state.update { it.copy(confirmDelete = null) }
+    fun requestDelete(mapping: KeywordMapping) = updateState { it.copy(confirmDelete = mapping) }
+    fun dismissDelete() = updateState { it.copy(confirmDelete = null) }
 
+    fun clearMessages() = updateState { it.copy(operationMessage = null, errorMessage = null) }
+
+    /* ------------------------- Business Logic ------------------------- */
+
+    /**
+     * Persists the mapping (Add or Update) and triggers recategorization.
+     */
     fun save() {
-        val s = _state.value
+        val s = state.value
         val keyword = s.keyword.trim()
 
-        if (keyword.isBlank()) {
-            _state.update { it.copy(errorMessage = "Enter a keyword") }
-            return
-        }
-        if (s.categoryId.isBlank()) {
-            _state.update { it.copy(errorMessage = "Select a category") }
-            return
-        }
+        if (keyword.isBlank()) return setError("Enter a keyword")
+        if (s.categoryId.isBlank()) return setError("Select a category")
         if (s.isSaving) return
 
         viewModelScope.launch {
-            _state.update { it.copy(isSaving = true, errorMessage = null, operationMessage = null) }
+            updateState { it.copy(isSaving = true, errorMessage = null, operationMessage = null) }
 
             val isEdit = s.isEditMode && s.editing != null
             val oldKeyword = s.editing?.keyword?.trim().orEmpty()
@@ -177,68 +215,75 @@ class KeywordMappingViewModel(
                 is Result.Success -> {
                     log("✅ Mapping ${if (isEdit) "UPDATED" else "ADDED"} | old='$oldKeyword' new='$keyword'")
 
-                    // Recategorize only when it matters
+                    // --- Smart Recategorization ---
                     if (isEdit) {
-                        if (oldKeyword.isNotBlank()) recategorizeExpensesByKeyword(oldKeyword)
-                        if (!keyword.equals(
+                        // 1. If the keyword string changed, we must re-process the OLD keyword
+                        //    (to potentially remove incorrect matches or apply fallback rules).
+                        if (oldKeyword.isNotBlank() && !keyword.equals(
                                 oldKeyword,
                                 ignoreCase = true
                             )
-                        ) recategorizeExpensesByKeyword(keyword)
+                        ) {
+                            recategorizeExpensesByKeyword(oldKeyword)
+                        }
+                        // 2. Process the NEW keyword to apply the updated category/priority.
+                        recategorizeExpensesByKeyword(keyword)
                     } else {
+                        // New mapping: Apply immediately to existing transactions.
                         recategorizeExpensesByKeyword(keyword)
                     }
 
-                    _state.update {
+                    updateState {
                         it.copy(
                             isSheetOpen = false,
                             isSaving = false,
-                            operationMessage = if (isEdit) "Mapping updated" else "Mapping added",
-                            errorMessage = null
+                            operationMessage = if (isEdit) "Mapping updated" else "Mapping added"
                         )
                     }
-                    // Keep your current behavior: re-fetch after mutation.
-                    load()
+                    load() // Refresh list UI
                 }
 
-                is Result.Error -> _state.update {
-                    it.copy(
-                        isSaving = false,
-                        errorMessage = result.message ?: "Failed to save"
-                    )
+                is Result.Error -> {
+                    updateState {
+                        it.copy(
+                            isSaving = false,
+                            errorMessage = result.message ?: "Failed to save"
+                        )
+                    }
                 }
 
-                else -> _state.update { it.copy(isSaving = false) }
+                else -> updateState { it.copy(isSaving = false) }
             }
         }
     }
 
     fun deleteConfirmed() {
-        val mapping = _state.value.confirmDelete ?: return
+        val mapping = state.value.confirmDelete ?: return
 
         viewModelScope.launch {
             when (val res = deleteKeywordMapping(mapping.id)) {
                 is Result.Success -> {
                     val kw = mapping.keyword.trim()
-                    log("🗑️ Mapping DELETED | keyword='$kw' id='${mapping.id}'")
+                    log("🗑️ Mapping DELETED | keyword='$kw'")
 
+                    // If a rule is deleted, re-run categorization on that keyword.
+                    // This allows other lower-priority rules (if any) to take effect,
+                    // or leaves the transactions uncategorized/manual.
                     if (kw.isNotBlank()) recategorizeExpensesByKeyword(kw)
 
-                    _state.update {
-                        it.copy(
-                            confirmDelete = null,
-                            operationMessage = "Mapping deleted",
-                            errorMessage = null
-                        )
+                    updateState {
+                        it.copy(confirmDelete = null, operationMessage = "Mapping deleted")
                     }
                     load()
                 }
 
-                is Result.Error -> _state.update {
-                    it.copy(
-                        confirmDelete = null,
-                        errorMessage = res.message ?: "Failed to delete"
-                    )
+                is Result.Error -> {
+                    updateState {
+                        it.copy(
+                            confirmDelete = null,
+                            errorMessage = res.message ?: "Failed to delete"
+                        )
+                    }
                 }
 
                 else -> Unit
@@ -246,7 +291,13 @@ class KeywordMappingViewModel(
         }
     }
 
-    fun clearMessages() = _state.update { it.copy(operationMessage = null, errorMessage = null) }
+    /* ------------------------- Helpers ------------------------- */
+
+    private fun updateState(transform: (KeywordMappingState) -> KeywordMappingState) {
+        _state.update(transform)
+    }
+
+    private fun setError(msg: String) = updateState { it.copy(errorMessage = msg) }
 
     private fun log(message: String) {
         Log.i(TAG, message)

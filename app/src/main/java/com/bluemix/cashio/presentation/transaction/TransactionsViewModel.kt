@@ -28,21 +28,23 @@ class TransactionViewModel(
     private var searchJob: Job? = null
 
     init {
-        fetchTransactions(showLoading = true)
+        loadAll()
     }
+
+    /* ------------------------- Data Loading ------------------------- */
 
     fun loadAll() = fetchTransactions(showLoading = true)
 
     fun refresh() {
-        if (_state.value.isRefreshing) return
+        if (state.value.isRefreshing) return
         fetchTransactions(showLoading = false)
     }
 
     private fun fetchTransactions(showLoading: Boolean) {
         viewModelScope.launch {
-            _state.update { s ->
-                s.copy(
-                    transactionsUi = if (showLoading) UiState.Loading else s.transactionsUi,
+            updateState {
+                it.copy(
+                    transactionsUi = if (showLoading) UiState.Loading else it.transactionsUi,
                     isRefreshing = !showLoading,
                     message = null
                 )
@@ -50,16 +52,17 @@ class TransactionViewModel(
 
             when (val result = getExpensesUseCase()) {
                 is Result.Success -> {
-                    _state.update { it.copy(allTransactions = result.data, isRefreshing = false) }
-                    applyFilters()
+                    updateState { it.copy(allTransactions = result.data, isRefreshing = false) }
+                    recalculateList()
 
-                    _state.value.selectedId?.let { id ->
+                    // If we have a selection, ensure its details are fresh
+                    state.value.selectedId?.let { id ->
                         syncDetailsFromCacheOrFetch(id, preferCache = true)
                     }
                 }
 
                 is Result.Error -> {
-                    _state.update {
+                    updateState {
                         it.copy(
                             isRefreshing = false,
                             transactionsUi = UiState.Error(
@@ -69,133 +72,149 @@ class TransactionViewModel(
                     }
                 }
 
-                Result.Loading -> _state.update { it.copy(isRefreshing = !showLoading) }
+                else -> Unit
             }
         }
     }
 
+    /* ------------------------- Filtering & Sorting ------------------------- */
+
     fun setQuery(value: String) {
-        _state.update { it.copy(query = value) }
+        updateState { it.copy(query = value) }
 
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            delay(180)
-            if (_state.value.transactionsUi is UiState.Loading) return@launch
-            applyFilters()
+            delay(180) // Debounce
+            recalculateList()
         }
     }
 
     fun setTypeFilter(value: TransactionTypeFilter) {
-        _state.update { it.copy(typeFilter = value) }
-        applyFilters()
+        updateState { it.copy(typeFilter = value) }
+        recalculateList()
     }
 
     fun setSort(value: TransactionSort) {
-        _state.update { it.copy(sort = value) }
-        applyFilters()
+        updateState { it.copy(sort = value) }
+        recalculateList()
     }
 
-    private fun applyFilters() {
-        val s = _state.value
+    /**
+     * Applies filters to the master list and updates the UI state.
+     * Keeps the "Source of Truth" (allTransactions) separate from "View" (transactionsUi).
+     */
+    private fun recalculateList() {
+        val s = state.value
         val filtered = filterAndSortTransactions(
             list = s.allTransactions,
             query = s.query,
             typeFilter = s.typeFilter,
             sort = s.sort
         )
-        _state.update { it.copy(transactionsUi = UiState.Success(filtered)) }
+        updateState { it.copy(transactionsUi = UiState.Success(filtered)) }
     }
 
+    /* ------------------------- Details Selection ------------------------- */
+
     fun selectTransaction(expenseId: String) {
-        _state.update { it.copy(selectedId = expenseId, deleteSuccess = false, message = null) }
+        updateState { it.copy(selectedId = expenseId, deleteSuccess = false, message = null) }
         syncDetailsFromCacheOrFetch(expenseId, preferCache = true)
     }
 
     fun clearSelection() {
-        _state.update { it.copy(selectedId = null, detailsUi = UiState.Idle) }
+        updateState { it.copy(selectedId = null, detailsUi = UiState.Idle) }
     }
 
     private fun syncDetailsFromCacheOrFetch(expenseId: String, preferCache: Boolean) {
-        val cached = _state.value.allTransactions.firstOrNull { it.id == expenseId }
+        val cached = state.value.allTransactions.find { it.id == expenseId }
+
         if (preferCache && cached != null) {
-            _state.update { it.copy(detailsUi = UiState.Success(cached)) }
+            updateState { it.copy(detailsUi = UiState.Success(cached)) }
             return
         }
 
         viewModelScope.launch {
-            _state.update { it.copy(detailsUi = UiState.Loading) }
+            updateState { it.copy(detailsUi = UiState.Loading) }
 
             when (val result = getExpenseByIdUseCase(expenseId)) {
                 is Result.Success -> {
                     val tx = result.data
-                    if (tx == null) {
-                        _state.update { it.copy(detailsUi = UiState.Error("Transaction not found")) }
-                        return@launch
-                    }
-
-                    _state.update { old ->
-                        val replaced = old.allTransactions.toMutableList().apply {
-                            val idx = indexOfFirst { it.id == expenseId }
-                            if (idx >= 0) set(idx, tx) else add(0, tx)
+                    if (tx != null) {
+                        // Update Master List with fresh data if it exists there
+                        updateState { old ->
+                            val updatedList =
+                                old.allTransactions.map { if (it.id == expenseId) tx else it }
+                            old.copy(allTransactions = updatedList, detailsUi = UiState.Success(tx))
                         }
-                        old.copy(allTransactions = replaced)
+                        recalculateList() // Re-apply sort/filter to reflect changes
+                    } else {
+                        updateState { it.copy(detailsUi = UiState.Error("Transaction not found")) }
                     }
-
-                    applyFilters()
-                    _state.update { it.copy(detailsUi = UiState.Success(tx)) }
                 }
 
-                is Result.Error -> _state.update {
-                    it.copy(detailsUi = UiState.Error(result.message ?: "Failed to load details"))
+                is Result.Error -> {
+                    updateState {
+                        it.copy(
+                            detailsUi = UiState.Error(
+                                result.message ?: "Failed to load details"
+                            )
+                        )
+                    }
                 }
 
-                Result.Loading -> Unit
+                else -> Unit
             }
         }
     }
 
+    /* ------------------------- Deletion ------------------------- */
+
     fun deleteTransaction(expenseId: String) {
-        if (_state.value.isDeleting) return
+        if (state.value.isDeleting) return
 
         viewModelScope.launch {
-            _state.update { it.copy(isDeleting = true, deleteSuccess = false, message = null) }
+            updateState { it.copy(isDeleting = true, deleteSuccess = false, message = null) }
 
             when (val result = deleteExpenseUseCase(expenseId)) {
                 is Result.Success -> {
-                    _state.update { old ->
+                    // Optimistic update: remove locally immediately
+                    updateState { old ->
                         val newAll = old.allTransactions.filterNot { it.id == expenseId }
-                        val clearingDetails = old.selectedId == expenseId
+                        val wasSelected = old.selectedId == expenseId
 
                         old.copy(
                             allTransactions = newAll,
-                            selectedId = if (clearingDetails) null else old.selectedId,
-                            detailsUi = if (clearingDetails) UiState.Idle else old.detailsUi,
+                            selectedId = if (wasSelected) null else old.selectedId,
+                            detailsUi = if (wasSelected) UiState.Idle else old.detailsUi,
                             isDeleting = false,
                             deleteSuccess = true,
                             message = "Transaction deleted"
                         )
                     }
-                    applyFilters()
+                    recalculateList()
                 }
 
-                is Result.Error -> _state.update {
-                    it.copy(
-                        isDeleting = false,
-                        message = result.message ?: "Failed to delete transaction"
-                    )
+                is Result.Error -> {
+                    updateState {
+                        it.copy(
+                            isDeleting = false,
+                            message = result.message ?: "Failed to delete"
+                        )
+                    }
                 }
 
-                Result.Loading -> _state.update { it.copy(isDeleting = true) }
+                else -> updateState { it.copy(isDeleting = false) }
             }
         }
     }
 
-    fun consumeDeleteSuccess() {
-        _state.update { it.copy(deleteSuccess = false) }
-    }
+    fun consumeDeleteSuccess() = updateState { it.copy(deleteSuccess = false) }
+    fun clearMessage() = updateState { it.copy(message = null) }
 
-    fun clearMessage() {
-        _state.update { it.copy(message = null) }
+    /* ------------------------- Helpers ------------------------- */
+
+    private fun updateState(transform: (TransactionsState) -> TransactionsState) {
+        _state.update(transform)
     }
 
     override fun onCleared() {

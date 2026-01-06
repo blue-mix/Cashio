@@ -6,8 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +20,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -38,7 +37,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -57,18 +55,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bluemix.cashio.core.format.CashioFormat.toDateLabel
+import com.bluemix.cashio.core.format.CashioFormat.toEpochMillis
+import com.bluemix.cashio.core.format.CashioFormat.toLocalDate
+import com.bluemix.cashio.core.format.CashioFormat.toTimeLabel
 import com.bluemix.cashio.domain.model.Category
 import com.bluemix.cashio.domain.model.TransactionType
 import com.bluemix.cashio.presentation.common.UiState
@@ -77,23 +78,33 @@ import com.bluemix.cashio.ui.components.defaults.CashioTopBar
 import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
 import com.bluemix.cashio.ui.components.defaults.TopBarAction
 import com.bluemix.cashio.ui.components.defaults.TopBarIcon
-import com.bluemix.cashio.ui.theme.CashioSemantic.ExpenseRed
-import com.bluemix.cashio.ui.theme.CashioSemantic.IncomeGreen
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioRadius
+import com.bluemix.cashio.ui.theme.CashioSemantic
+import com.bluemix.cashio.ui.theme.CashioShapes
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
-private val DateLabelFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("dd MMM, yyyy")
-
-private val TimeLabelFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("HH:mm")
-
+/**
+ * Screen for creating a new transaction or editing an existing one.
+ *
+ * This screen operates in two modes based on the [expenseId] argument:
+ * 1. **Create Mode (null ID):** Starts with a blank form.
+ * 2. **Edit Mode (valid ID):** Pre-fills the form with existing data via the ViewModel.
+ *
+ * Key Features:
+ * - Haptic feedback integration for user interactions.
+ * - Collapsible "More Details" section to keep the UI clean.
+ * - Custom Date and Time pickers bridging Java Time with Material 3.
+ *
+ * @param onNavigateBack Callback to finish the screen.
+ * @param onNavigateToCategories Callback to open the Category management screen.
+ * @param expenseId If provided, triggers Edit Mode.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(
@@ -107,28 +118,30 @@ fun AddExpenseScreen(
     val haptic = LocalHapticFeedback.current
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    // Load edit or reset for add
+    // Initialize mode (Add vs Edit)
     LaunchedEffect(expenseId) {
         if (expenseId != null) viewModel.loadExpenseForEdit(expenseId)
         else viewModel.resetForm()
     }
 
-    // Navigate back on save success
+    // Handle successful save navigation
     LaunchedEffect(state.saveSuccess) {
         if (!state.saveSuccess) return@LaunchedEffect
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        delay(80)
+        delay(80) // Slight delay to allow ripple animation
         viewModel.consumeSaveSuccess()
         onNavigateBack()
     }
 
     var showMoreDetails by rememberSaveable { mutableStateOf(false) }
-
-    // Date + Time pickers state
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
         CashioTopBar(
             title = CashioTopBarTitle.Text(
                 if (state.isEditMode) "Edit Transaction" else "Add Transaction"
@@ -137,19 +150,20 @@ fun AddExpenseScreen(
                 icon = TopBarIcon.Vector(Icons.Default.Close),
                 onClick = onNavigateBack
             ),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+            modifier = Modifier.padding(horizontal = CashioPadding.screen)
         )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(CashioSpacing.default),
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 8.dp,
-                bottom = navBarPadding + 16.dp
+                start = CashioPadding.screen,
+                end = CashioPadding.screen,
+                top = CashioSpacing.small,
+                bottom = navBarPadding + CashioSpacing.default
             )
         ) {
+            // Section: Transaction Type (Income/Expense)
             item {
                 SectionCard {
                     Text(
@@ -157,7 +171,7 @@ fun AddExpenseScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(CashioSpacing.medium))
                     TransactionTypeRow(
                         selectedType = state.transactionType,
                         onTypeSelected = {
@@ -168,6 +182,7 @@ fun AddExpenseScreen(
                 }
             }
 
+            // Section: Main Details (Amount & Title)
             item {
                 SectionCard {
                     AmountField(
@@ -175,7 +190,7 @@ fun AddExpenseScreen(
                         transactionType = state.transactionType,
                         onAmountChange = viewModel::updateAmount
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(CashioSpacing.medium))
                     TitleField(
                         title = state.title,
                         onTitleChange = viewModel::updateTitle
@@ -183,6 +198,7 @@ fun AddExpenseScreen(
                 }
             }
 
+            // Section: Category Selection
             item {
                 SectionCard {
                     Row(
@@ -198,14 +214,13 @@ fun AddExpenseScreen(
                         TextButton(onClick = onNavigateToCategories) { Text("Manage") }
                     }
 
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(CashioSpacing.medium))
 
                     when (val categoriesState = state.categories) {
                         UiState.Loading -> {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center
-                            ) { CircularProgressIndicator() }
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
                         }
 
                         is UiState.Success -> {
@@ -231,6 +246,7 @@ fun AddExpenseScreen(
                 }
             }
 
+            // Section: Optional Details (Date, Time, Note)
             item {
                 SectionCard {
                     Row(
@@ -260,37 +276,31 @@ fun AddExpenseScreen(
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically()
                     ) {
-                        Column(modifier = Modifier.padding(top = 12.dp)) {
-                            DateRow(
-                                dateTime = state.date,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    showDatePicker = true
-                                }
+                        Column(modifier = Modifier.padding(top = CashioSpacing.medium)) {
+                            DetailPickerRow(
+                                label = "Date",
+                                value = state.date.toDateLabel(),
+                                icon = Icons.Default.CalendarToday,
+                                onClick = { showDatePicker = true }
                             )
-                            Spacer(Modifier.height(12.dp))
-
-                            TimeRow(
-                                dateTime = state.date,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    showTimePicker = true
-                                }
+                            Spacer(Modifier.height(CashioSpacing.medium))
+                            DetailPickerRow(
+                                label = "Time",
+                                value = state.date.toTimeLabel(),
+                                icon = Icons.Default.Schedule,
+                                onClick = { showTimePicker = true }
                             )
-                            Spacer(Modifier.height(12.dp))
-
+                            Spacer(Modifier.height(CashioSpacing.medium))
                             NoteField(note = state.note, onNoteChange = viewModel::updateNote)
                         }
                     }
                 }
             }
 
+            // Save Button
             item {
                 val isValid =
-                    state.amount.isNotBlank() &&
-                            state.title.isNotBlank() &&
-                            state.selectedCategory != null
-
+                    state.amount.isNotBlank() && state.title.isNotBlank() && state.selectedCategory != null
                 SaveButton(
                     text = when {
                         state.isSaving -> "Saving..."
@@ -308,60 +318,42 @@ fun AddExpenseScreen(
         }
     }
 
-    // "Real" error dialog (data failures)
-    state.errorMessage?.let { error ->
-        AlertDialog(
-            onDismissRequest = viewModel::clearError,
-            title = { Text("Error") },
-            text = { Text(error) },
-            confirmButton = {
-                TextButton(onClick = viewModel::clearError) { Text("OK") }
-            }
-        )
-    }
-
-    // ✅ Premium Date Picker
     if (showDatePicker) {
         CashioDatePickerDialog(
             initialDateTime = state.date,
             onDismiss = { showDatePicker = false },
             onConfirm = { newDate ->
-                // preserve time
-                val updated = LocalDateTime.of(newDate, state.date.toLocalTime())
-                viewModel.updateDate(updated)
+                viewModel.updateDate(LocalDateTime.of(newDate, state.date.toLocalTime()))
                 showDatePicker = false
             }
         )
     }
 
-    // ✅ Premium Time Picker
     if (showTimePicker) {
         CashioTimePickerDialog(
             initialDateTime = state.date,
             onDismiss = { showTimePicker = false },
             onConfirm = { newTime ->
-                // preserve date
-                val updated = LocalDateTime.of(state.date.toLocalDate(), newTime)
-                viewModel.updateDate(updated)
+                viewModel.updateDate(LocalDateTime.of(state.date.toLocalDate(), newTime))
                 showTimePicker = false
             }
         )
     }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Internal UI Components                                                      */
+/* -------------------------------------------------------------------------- */
+
 @Composable
-private fun SectionCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
+private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
     CashioCard(
-        modifier = modifier.fillMaxWidth(),
-        padding = PaddingValues(16.dp),
-        cornerRadius = 16.dp,
-        showBorder = true
-    ) {
-        Column(content = content)
-    }
+        modifier = Modifier.fillMaxWidth(),
+        padding = PaddingValues(CashioPadding.card),
+        cornerRadius = CashioShapes.card,
+        showBorder = true,
+        content = { Column(content = content) }
+    )
 }
 
 @Composable
@@ -371,19 +363,19 @@ private fun TransactionTypeRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium)
     ) {
         TypePill(
             text = "Expense",
             selected = selectedType == TransactionType.EXPENSE,
-            color = ExpenseRed,
+            color = CashioSemantic.ExpenseRed,
             onClick = { onTypeSelected(TransactionType.EXPENSE) },
             modifier = Modifier.weight(1f)
         )
         TypePill(
             text = "Income",
             selected = selectedType == TransactionType.INCOME,
-            color = IncomeGreen,
+            color = CashioSemantic.IncomeGreen,
             onClick = { onTypeSelected(TransactionType.INCOME) },
             modifier = Modifier.weight(1f)
         )
@@ -396,28 +388,16 @@ private fun TypePill(
     selected: Boolean,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isPressed) 0.985f else 1f,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy
-        ),
-        label = "TypePillScale"
-    )
-
     Surface(
-        modifier = modifier.scale(scale),
-        shape = RoundedCornerShape(999.dp),
+        modifier = modifier,
+        shape = RoundedCornerShape(CashioRadius.pill),
         color = if (selected) color.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
-        onClick = onClick,
-        interactionSource = interactionSource
+        onClick = onClick
     ) {
         Box(
-            modifier = Modifier.padding(vertical = 12.dp),
+            modifier = Modifier.padding(vertical = CashioSpacing.medium),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -431,50 +411,74 @@ private fun TypePill(
 }
 
 @Composable
+private fun DetailPickerRow(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(CashioRadius.small),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(CashioSpacing.mediumLarge),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(CashioSpacing.compact),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun AmountField(
     amount: String,
     transactionType: TransactionType,
     onAmountChange: (String) -> Unit
 ) {
-    val accent = if (transactionType == TransactionType.EXPENSE) ExpenseRed else IncomeGreen
-
+    val accent =
+        if (transactionType == TransactionType.EXPENSE) CashioSemantic.ExpenseRed else CashioSemantic.IncomeGreen
     OutlinedTextField(
         value = amount,
         onValueChange = onAmountChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text("Amount *") },
-        placeholder = { Text("0.00") },
-        prefix = { Text("₹", fontWeight = FontWeight.Bold, color = accent) },
-        singleLine = true,
+        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = accent) },
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surface,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
             focusedBorderColor = accent,
             unfocusedBorderColor = MaterialTheme.colorScheme.outline
         ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(CashioRadius.small)
     )
 }
 
 @Composable
-private fun TitleField(
-    title: String,
-    onTitleChange: (String) -> Unit
-) {
+private fun TitleField(title: String, onTitleChange: (String) -> Unit) {
     OutlinedTextField(
         value = title,
         onValueChange = onTitleChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text("Title *") },
-        placeholder = { Text("e.g., Grocery Shopping") },
-        singleLine = true,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surface,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-        ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(CashioRadius.small)
     )
 }
 
@@ -484,165 +488,63 @@ private fun CategoryRow(
     selectedCategoryId: String?,
     onCategorySelected: (Category) -> Unit
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(CashioSpacing.compact)) {
         items(categories, key = { it.id }) { category ->
             val selected = category.id == selectedCategoryId
-
             FilterChip(
                 selected = selected,
                 onClick = { onCategorySelected(category) },
                 label = { Text(category.name) },
                 leadingIcon = { Text(category.icon) },
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     selectedContainerColor = category.color.copy(alpha = 0.18f),
-                    selectedLabelColor = category.color,
-                    selectedLeadingIconColor = category.color
-                )
+                    selectedLabelColor = category.color
+                ),
+                shape = RoundedCornerShape(CashioRadius.pill)
             )
         }
     }
 }
 
 @Composable
-private fun DateRow(
-    dateTime: LocalDateTime,
-    onClick: () -> Unit
-) {
-    val label = remember(dateTime) { dateTime.toLocalDate().format(DateLabelFormatter) }
-
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.CalendarToday, contentDescription = null)
-                Text(
-                    text = "Date",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun TimeRow(
-    dateTime: LocalDateTime,
-    onClick: () -> Unit
-) {
-    val label = remember(dateTime) { dateTime.toLocalTime().format(TimeLabelFormatter) }
-
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Schedule, contentDescription = null)
-                Text(
-                    text = "Time",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun NoteField(
-    note: String,
-    onNoteChange: (String) -> Unit
-) {
+private fun NoteField(note: String, onNoteChange: (String) -> Unit) {
     OutlinedTextField(
         value = note,
         onValueChange = onNoteChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text("Note") },
-        placeholder = { Text("Optional") },
         minLines = 3,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-        ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(CashioRadius.small)
     )
 }
 
 @Composable
-private fun SaveButton(
-    text: String,
-    enabled: Boolean,
-    isLoading: Boolean,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isPressed) 0.985f else 1f,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy
-        ),
-        label = "SaveButtonScale"
-    )
-
+private fun SaveButton(text: String, enabled: Boolean, isLoading: Boolean, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        interactionSource = interactionSource,
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .scale(scale),
-        shape = RoundedCornerShape(14.dp),
+            .height(56.dp),
+        shape = RoundedCornerShape(CashioRadius.mediumSmall),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(strokeWidth = 2.dp)
-            Spacer(Modifier.width(10.dp))
-        }
-        Text(text = text, fontWeight = FontWeight.SemiBold)
+        if (isLoading) CircularProgressIndicator(
+            modifier = Modifier.size(20.dp),
+            strokeWidth = 2.dp
+        )
+        else Text(text = text, fontWeight = FontWeight.SemiBold)
     }
 }
 
 /* -------------------------------------------------------------------------- */
-/* Premium Pickers                                                              */
+/* Premium Pickers (Wrappers)                                                  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * A wrapper around Material 3 [DatePickerDialog] that bridges
+ * standard [LocalDate] with the picker's millisecond-based state.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CashioDatePickerDialog(
@@ -650,33 +552,25 @@ private fun CashioDatePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit
 ) {
-    val initialMillis = remember(initialDateTime) { initialDateTime.toEpochMillis() }
-
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialMillis
-    )
-
+    val datePickerState =
+        rememberDatePickerState(initialSelectedDateMillis = initialDateTime.toEpochMillis())
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(
-                onClick = {
-                    val millis = datePickerState.selectedDateMillis ?: initialMillis
-                    onConfirm(millis.toLocalDate())
-                }
-            ) { Text("Done") }
+            TextButton(onClick = {
+                onConfirm(
+                    datePickerState.selectedDateMillis?.toLocalDate() ?: LocalDate.now()
+                )
+            }) { Text("Done") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-        colors = DatePickerDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        DatePicker(state = datePickerState)
-    }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    ) { DatePicker(state = datePickerState) }
 }
 
+/**
+ * A wrapper around Material 3 [TimePicker] that bridges
+ * standard [LocalTime] with the picker's hour/minute state.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CashioTimePickerDialog(
@@ -684,40 +578,25 @@ private fun CashioTimePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (LocalTime) -> Unit
 ) {
-    val initialTime = remember(initialDateTime) { initialDateTime.toLocalTime() }
     val timeState = rememberTimePickerState(
-        initialHour = initialTime.hour,
-        initialMinute = initialTime.minute,
+        initialHour = initialDateTime.hour,
+        initialMinute = initialDateTime.minute,
         is24Hour = true
     )
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Select time") },
-        text = {
-            TimePicker(state = timeState)
-        },
+        text = { TimePicker(state = timeState) },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm(LocalTime.of(timeState.hour, timeState.minute))
-                }
-            ) { Text("Done") }
+            TextButton(onClick = {
+                onConfirm(
+                    LocalTime.of(
+                        timeState.hour,
+                        timeState.minute
+                    )
+                )
+            }) { Text("Done") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
-}
-
-/* -------------------------------------------------------------------------- */
-/* Date helpers                                                                 */
-/* -------------------------------------------------------------------------- */
-
-private fun LocalDateTime.toEpochMillis(zoneId: ZoneId = ZoneId.systemDefault()): Long {
-    return this.atZone(zoneId).toInstant().toEpochMilli()
-}
-
-private fun Long.toLocalDate(zoneId: ZoneId = ZoneId.systemDefault()): LocalDate {
-    return Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
 }

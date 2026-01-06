@@ -1,6 +1,7 @@
 package com.bluemix.cashio.presentation.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -16,7 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.presentation.settings.vm.SettingsMessage
-
+import com.bluemix.cashio.ui.theme.CashioRadius
+import com.bluemix.cashio.ui.theme.CashioSpacing
 
 @Composable
 fun SettingsMessageBanner(
@@ -42,26 +44,38 @@ fun SettingsMessageBanner(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = bg
+        // Used CashioRadius.small (12dp)
+        shape = RoundedCornerShape(CashioRadius.small),
+        color = bg,
+        tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                // Used CashioSpacing.medium (12dp) and CashioSpacing.small (8dp)
+                .padding(horizontal = CashioSpacing.medium, vertical = CashioSpacing.small),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = text,
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
                 color = fg,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
 
-            TextButton(onClick = onDismiss) {
-                Text("Dismiss", style = MaterialTheme.typography.labelSmall, color = fg)
+            TextButton(
+                onClick = onDismiss,
+                // Ensure the button touch target is still large enough but visually aligned
+                contentPadding = PaddingValues(horizontal = CashioSpacing.small)
+            ) {
+                Text(
+                    text = "Dismiss",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fg
+                )
             }
         }
     }

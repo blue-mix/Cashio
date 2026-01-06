@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
  * Repository interface for Category operations
  */
 interface CategoryRepository {
+    suspend fun seedDefaults(): Result<Boolean>
 
     /**
      * Observe all categories as Flow

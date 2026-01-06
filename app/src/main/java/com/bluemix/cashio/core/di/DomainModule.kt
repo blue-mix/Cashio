@@ -1,5 +1,6 @@
 package com.bluemix.cashio.core.di
 
+import com.bluemix.cashio.domain.usecase.base.SeedDatabaseUseCase
 import com.bluemix.cashio.domain.usecase.category.AddCategoryUseCase
 import com.bluemix.cashio.domain.usecase.category.DeleteCategoryUseCase
 import com.bluemix.cashio.domain.usecase.category.GetCategoriesUseCase
@@ -19,35 +20,35 @@ import com.bluemix.cashio.domain.usecase.keyword.AddKeywordMappingUseCase
 import com.bluemix.cashio.domain.usecase.keyword.DeleteKeywordMappingUseCase
 import com.bluemix.cashio.domain.usecase.keyword.GetKeywordMappingsUseCase
 import com.bluemix.cashio.domain.usecase.keyword.UpdateKeywordMappingUseCase
+import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 
 val domainModule = module {
-    // Expense Use Cases
-    factory { GetExpensesUseCase(get()) }
-    factory { GetExpenseByIdUseCase(get()) }
-    factory { GetExpensesByDateRangeUseCase(get()) }
-    factory { AddExpenseUseCase(get()) }
-    factory { UpdateExpenseUseCase(get()) }
-    factory { DeleteExpenseUseCase(get()) }
-    factory { GetFinancialStatsUseCase(get()) }
-    factory { RefreshExpensesFromSmsUseCase(get()) }
-    // DomainModule.kt
-    factory { ObserveExpensesUseCase(get()) }
-    factory { ObserveExpensesByDateRangeUseCase(get()) }
+    // Common
+    factoryOf(::SeedDatabaseUseCase)
 
+    // Expense
+    factoryOf(::ObserveExpensesUseCase)
+    factoryOf(::ObserveExpensesByDateRangeUseCase)
+    factoryOf(::GetExpensesUseCase)
+    factoryOf(::GetExpensesByDateRangeUseCase)
+    factoryOf(::GetExpenseByIdUseCase)
+    factoryOf(::AddExpenseUseCase)
+    factoryOf(::UpdateExpenseUseCase)
+    factoryOf(::DeleteExpenseUseCase)
+    factoryOf(::GetFinancialStatsUseCase)
+    factoryOf(::RefreshExpensesFromSmsUseCase)
+    factoryOf(::RecategorizeExpensesByKeywordUseCase)
 
-    // Category Use Cases
-    factory { GetCategoriesUseCase(get()) }
-    factory { AddCategoryUseCase(get()) }
-    factory { UpdateCategoryUseCase(get()) }
-    factory { DeleteCategoryUseCase(get()) }
+    // Category
+    factoryOf(::GetCategoriesUseCase)
+    factoryOf(::AddCategoryUseCase)
+    factoryOf(::UpdateCategoryUseCase)
+    factoryOf(::DeleteCategoryUseCase)
 
-    // Keyword Use Cases (minimal)
-    factory { GetKeywordMappingsUseCase(get()) }
-    factory { AddKeywordMappingUseCase(get()) }
-    factory { DeleteKeywordMappingUseCase(get()) }
-    factory { UpdateKeywordMappingUseCase(get()) }
-    factory { RecategorizeExpensesByKeywordUseCase(get()) }
-
-
+    // Keyword
+    factoryOf(::GetKeywordMappingsUseCase)
+    factoryOf(::AddKeywordMappingUseCase)
+    factoryOf(::UpdateKeywordMappingUseCase)
+    factoryOf(::DeleteKeywordMappingUseCase)
 }

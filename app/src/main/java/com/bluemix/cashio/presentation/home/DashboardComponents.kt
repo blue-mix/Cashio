@@ -2,42 +2,29 @@ package com.bluemix.cashio.presentation.home
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Wallet
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,14 +35,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.bluemix.cashio.core.format.CashioFormat
+import com.bluemix.cashio.ui.components.defaults.CashioCard
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioRadius
 import com.bluemix.cashio.ui.theme.CashioSemantic
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlinx.coroutines.delay
 
+/**
+ * A hero card displayed at the top of the dashboard.
+ *
+ * Visualizes the total amount spent in the current month alongside a
+ * trend indicator comparing it to the previous month's spending.
+ *
+ * @param amount The total expense amount for the current month.
+ * @param percentageChange The delta percentage (0-100+) vs last month.
+ * @param isIncrease True if spending is higher than last month (triggers red/bad), false if lower (green/good).
+ */
 @Composable
 fun MonthSpendCard(
     amount: Double,
@@ -64,13 +63,13 @@ fun MonthSpendCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CashioRadius.large),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.25f),
         tonalElevation = 4.dp,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(CashioPadding.card),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -79,8 +78,9 @@ fun MonthSpendCard(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(CashioSpacing.small))
 
+            // Animate the number when it changes (e.g., after adding a new expense)
             AnimatedContent(
                 targetState = amount,
                 transitionSpec = {
@@ -90,11 +90,8 @@ fun MonthSpendCard(
                 },
                 label = "monthSpendAmount"
             ) { targetAmount ->
-                val formattedAmount = remember(targetAmount) {
-                    "₹${String.format("%.2f", targetAmount)}"
-                }
                 Text(
-                    text = formattedAmount,
+                    text = CashioFormat.money(targetAmount),
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
@@ -102,26 +99,32 @@ fun MonthSpendCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(CashioSpacing.small))
 
             val percentageText = remember(percentageChange, isIncrease) {
-                "${String.format("%.0f", percentageChange)}% ${if (isIncrease) "above" else "below"} last month"
+                val formatted = String.format("%.0f", percentageChange)
+                "$formatted% ${if (isIncrease) "above" else "below"} last month"
             }
 
+            // In financial context: Increase in spending = Bad (Red), Decrease = Good (Green)
             val deltaColor =
-                if (isIncrease) CashioSemantic.IncomeGreen else CashioSemantic.ExpenseRed
+                if (isIncrease) CashioSemantic.ExpenseRed else CashioSemantic.IncomeGreen
+            val icon = if (isIncrease) Icons.Default.TrendingUp else Icons.Default.TrendingDown
 
             Surface(
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                shape = RoundedCornerShape(CashioRadius.pill),
                 color = deltaColor.copy(alpha = 0.12f)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(CashioSpacing.tiny),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(
+                        horizontal = CashioSpacing.compact,
+                        vertical = CashioSpacing.tiny
+                    )
                 ) {
                     Icon(
-                        imageVector = if (isIncrease) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                        imageVector = icon,
                         contentDescription = null,
                         tint = deltaColor,
                         modifier = Modifier.size(16.dp)
@@ -139,39 +142,29 @@ fun MonthSpendCard(
     }
 }
 
+/**
+ * A compact navigation card showing the user's current "Spending Wallet" balance.
+ * Clicking this navigates to the detailed Wallet/History screen.
+ */
 @Composable
 fun SpendingWalletCard(
     balance: Double,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
-        label = "walletScale"
-    )
-
-    Surface(
+    CashioCard(
         onClick = onClick,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
-        shadowElevation = if (isPressed) 2.dp else 4.dp,
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(scale),
-        interactionSource = interactionSource
+        modifier = modifier.fillMaxWidth(),
+        cornerRadius = CashioRadius.medium,
+        padding = PaddingValues(CashioPadding.card)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(CashioSpacing.huge),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -187,7 +180,7 @@ fun SpendingWalletCard(
                 )
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AnimatedContent(
@@ -199,11 +192,8 @@ fun SpendingWalletCard(
                     },
                     label = "walletBalance"
                 ) { targetBalance ->
-                    val formattedBalance = remember(targetBalance) {
-                        "₹${String.format("%,.2f", targetBalance)}"
-                    }
                     Text(
-                        text = formattedBalance,
+                        text = CashioFormat.money(targetBalance),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
@@ -212,7 +202,7 @@ fun SpendingWalletCard(
                 }
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "View details",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(20.dp)
                 )
@@ -221,6 +211,13 @@ fun SpendingWalletCard(
     }
 }
 
+/**
+ * A utility wrapper that creates a staggered entrance animation for list items.
+ *
+ * @param key Unique identifier for the item (ensures animation runs only once per item).
+ * @param index The position index in the list, used to calculate the start delay.
+ * @param content The composable content to animate.
+ */
 @Composable
 fun AnimatedTransactionItem(
     key: Any,
@@ -230,6 +227,7 @@ fun AnimatedTransactionItem(
     var isVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(key) {
+        // Stagger effect: 50ms delay per item index
         delay(index * 50L)
         isVisible = true
     }
@@ -240,110 +238,5 @@ fun AnimatedTransactionItem(
         label = "txItemVisibility"
     ) {
         Box(modifier = Modifier.fillMaxWidth()) { content() }
-    }
-}
-
-@Composable
-fun DashboardLoadingState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            Text(
-                text = "Loading transactions...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-@Composable
-fun EmptyTransactionsCard(
-    modifier: Modifier = Modifier
-) {
-    var isVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) { isVisible = true }
-
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = fadeIn() + scaleIn(),
-        label = "emptyTxVisibility"
-    ) {
-        Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            tonalElevation = 0.dp,
-            modifier = modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(text = "📭", fontSize = 48.sp)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "No transactions yet",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Your expenses will appear here",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun DashboardErrorCard(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = "⚠️", fontSize = 40.sp)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Oops! Something went wrong",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = onRetry,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                Text("Retry")
-            }
-        }
     }
 }

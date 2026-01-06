@@ -16,34 +16,43 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-data class HeatmapThresholds(
-    val p50: Double = 0.0,
-    val p75: Double = 0.0,
-    val p90: Double = 0.0
-)
-
+/**
+ * State holder for the History screen.
+ *
+ * @property transactionsByDate Source of truth map grouping all loaded transactions by date.
+ * @property sortedDayGroups A pre-sorted list of all transaction groups (newest first).
+ * @property visibleDayGroups The derived list actually shown in the UI. If a date is selected, contains only that day.
+ * @property expenseTotalByDate Map of Date -> Total Spending (used for dots/heatmap).
+ * @property expenseHeatLevelByDate Map of Date -> Intensity Level (0-4) for calendar coloring.
+ * @property selectedDate The currently active filter from the calendar.
+ */
 data class HistoryState(
-    // Source of truth: grouped transactions (each day list sorted desc by time)
+    // Data Source
     val transactionsByDate: Map<LocalDate, List<Expense>> = emptyMap(),
-
-    // Pre-sorted day groups (sorted once on data updates)
     val sortedDayGroups: List<Pair<LocalDate, List<Expense>>> = emptyList(),
 
-    // What UI renders (either sortedDayGroups or selected day)
+    // UI Render Target (Filtered)
     val visibleDayGroups: List<Pair<LocalDate, List<Expense>>> = emptyList(),
 
-    // Expense-only totals for calendar heatmap
+    // Visualization Data
     val expenseTotalByDate: Map<LocalDate, Double> = emptyMap(),
-
-    // ✅ Dynamic heatmap outputs (0..4)
     val expenseHeatLevelByDate: Map<LocalDate, Int> = emptyMap(),
-    val heatmapThresholds: HeatmapThresholds = HeatmapThresholds(),
 
+    // UI Status
     val selectedDate: LocalDate? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 )
 
+/**
+ * ViewModel responsible for the Transaction History and Calendar Heatmap.
+ *
+ * Key Responsibilities:
+ * 1. Observes the full transaction stream.
+ * 2. Processes raw data into daily groups for the list.
+ * 3. Calculates "Spending Heat" dynamically based on the user's spending percentiles.
+ * 4. Manages filtering when a user taps a specific day on the calendar.
+ */
 class HistoryViewModel(
     private val observeExpensesUseCase: ObserveExpensesUseCase
 ) : ViewModel() {
@@ -60,7 +69,7 @@ class HistoryViewModel(
             observeExpensesUseCase()
                 .distinctUntilChanged()
                 .catch { t ->
-                    _state.update {
+                    updateState {
                         it.copy(
                             isLoading = false,
                             errorMessage = t.message ?: "Failed to load transactions"
@@ -68,109 +77,128 @@ class HistoryViewModel(
                     }
                 }
                 .collectLatest { transactions ->
-                    // Group by day + sort each day’s list desc by date-time
-                    val transactionsByDate = transactions
-                        .groupBy { it.date.toLocalDate() }
-                        .mapValues { (_, list) -> list.sortedByDescending { it.date } }
+                    // Heavy calculation offloaded to background via coroutine context
+                    val processed = processData(transactions)
 
-                    // Sorted day groups (desc)
-                    val sortedDayGroups = transactionsByDate
-                        .toList()
-                        .sortedByDescending { (date, _) -> date }
-
-                    // Expense-only totals for heatmap (per day)
-                    val expenseTotalByDate = transactionsByDate.mapValues { (_, dayItems) ->
-                        dayItems.asSequence()
-                            .filter { it.transactionType == TransactionType.EXPENSE }
-                            .sumOf { it.amount }
-                    }
-
-                    // ✅ Dynamic thresholds based on the user's own spend distribution
-                    val spendValuesSorted = expenseTotalByDate.values
-                        .asSequence()
-                        .filter { it > 0.0 }
-                        .sorted()
-                        .toList()
-
-                    val thresholds = computeHeatmapThresholds(spendValuesSorted)
-
-                    // ✅ Map date -> heat level (0..4)
-                    val heatLevels = expenseTotalByDate.mapValues { (_, v) ->
-                        spendingToHeatLevel(v, thresholds)
-                    }
-
-                    _state.update { old ->
-                        val updated = old.copy(
-                            transactionsByDate = transactionsByDate,
-                            sortedDayGroups = sortedDayGroups,
-                            expenseTotalByDate = expenseTotalByDate,
-                            expenseHeatLevelByDate = heatLevels,
-                            heatmapThresholds = thresholds,
+                    updateState { old ->
+                        val newState = old.copy(
+                            transactionsByDate = processed.byDate,
+                            sortedDayGroups = processed.sortedGroups,
+                            expenseTotalByDate = processed.totals,
+                            expenseHeatLevelByDate = processed.heatLevels,
                             isLoading = false,
                             errorMessage = null
                         )
-                        updated.copy(visibleDayGroups = buildVisibleDayGroups(updated))
+                        // Re-apply current selection filter to the new data
+                        newState.copy(visibleDayGroups = resolveVisibleGroups(newState))
                     }
                 }
         }
     }
 
     fun onDateClicked(date: LocalDate) {
-        _state.update { old ->
-            val newSelectedDate = if (old.selectedDate == date) null else date
-            val updated = old.copy(selectedDate = newSelectedDate)
-            updated.copy(visibleDayGroups = buildVisibleDayGroups(updated))
+        updateState { old ->
+            // Toggle selection: click same date to deselect
+            val newSelection = if (old.selectedDate == date) null else date
+            val newState = old.copy(selectedDate = newSelection)
+            newState.copy(visibleDayGroups = resolveVisibleGroups(newState))
         }
     }
 
     fun showAllTransactions() {
-        _state.update { old ->
-            val updated = old.copy(selectedDate = null)
-            updated.copy(visibleDayGroups = buildVisibleDayGroups(updated))
+        updateState { old ->
+            val newState = old.copy(selectedDate = null)
+            newState.copy(visibleDayGroups = resolveVisibleGroups(newState))
         }
     }
 
-    private fun buildVisibleDayGroups(state: HistoryState): List<Pair<LocalDate, List<Expense>>> {
-        val selected = state.selectedDate
-        return if (selected == null) {
-            state.sortedDayGroups
-        } else {
-            state.transactionsByDate[selected]?.let { listOf(selected to it) } ?: emptyList()
-        }
-    }
-}
+    /* -------------------------------------------------------------------------- */
+    /* Data Processing Logic                                                      */
+    /* -------------------------------------------------------------------------- */
 
-/* -------------------------------------------------------------------------- */
-/* Heatmap helpers                                                             */
-/* -------------------------------------------------------------------------- */
-
-private fun computeHeatmapThresholds(sortedPositiveValues: List<Double>): HeatmapThresholds {
-    // If there isn’t enough data, fall back gracefully
-    if (sortedPositiveValues.size < 4) {
-        val max = sortedPositiveValues.maxOrNull() ?: 0.0
-        return HeatmapThresholds(p50 = max, p75 = max, p90 = max)
-    }
-
-    fun percentile(p: Double): Double {
-        // p is 0..1
-        val n = sortedPositiveValues.size
-        val idx = ((n - 1) * p).roundToInt().coerceIn(0, n - 1)
-        return sortedPositiveValues[idx]
-    }
-
-    return HeatmapThresholds(
-        p50 = percentile(0.50),
-        p75 = percentile(0.75),
-        p90 = percentile(0.90)
+    private data class ProcessedData(
+        val byDate: Map<LocalDate, List<Expense>>,
+        val sortedGroups: List<Pair<LocalDate, List<Expense>>>,
+        val totals: Map<LocalDate, Double>,
+        val heatLevels: Map<LocalDate, Int>
     )
-}
 
-private fun spendingToHeatLevel(value: Double, t: HeatmapThresholds): Int {
-    if (value <= 0.0) return 0
-    return when {
-        value <= t.p50 -> 1
-        value <= t.p75 -> 2
-        value <= t.p90 -> 3
-        else -> 4
+    /**
+     * Transforms raw flat transactions into grouped, sorted, and analyzed data structures.
+     */
+    private fun processData(transactions: List<Expense>): ProcessedData {
+        // 1. Group by Date & Sort Descending
+        val byDate = transactions
+            .groupBy { it.date.toLocalDate() }
+            .mapValues { (_, list) -> list.sortedByDescending { it.date } }
+
+        val sortedGroups = byDate.toList().sortedByDescending { (date, _) -> date }
+
+        // 2. Calculate Daily Totals (Expenses only for heatmap)
+        val totals = byDate.mapValues { (_, items) ->
+            items.filter { it.transactionType == TransactionType.EXPENSE }.sumOf { it.amount }
+        }
+
+        // 3. Compute Dynamic Heatmap Thresholds
+        // We calculate percentiles (median, 75th, 90th) of *this specific user's* spending habits.
+        // This ensures the colors are meaningful regardless of whether they spend $10 or $1000 daily.
+        val positiveSpends = totals.values.filter { it > 0.0 }.sorted()
+        val thresholds = computeThresholds(positiveSpends)
+
+        // 4. Map Totals to Heat Levels (0-4)
+        val heatLevels = totals.mapValues { (_, amount) ->
+            getHeatLevel(amount, thresholds)
+        }
+
+        return ProcessedData(byDate, sortedGroups, totals, heatLevels)
+    }
+
+    /**
+     * Filters the visible list based on the currently selected date.
+     * If no date is selected, returns the full history.
+     */
+    private fun resolveVisibleGroups(state: HistoryState): List<Pair<LocalDate, List<Expense>>> {
+        return state.selectedDate?.let { date ->
+            // If date selected, return list containing ONLY that day (if it has data)
+            state.transactionsByDate[date]?.let { listOf(date to it) }
+        } ?: state.sortedDayGroups // Otherwise return everything
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /* Heatmap Math Helpers                                                       */
+    /* -------------------------------------------------------------------------- */
+
+    private data class Thresholds(val p50: Double, val p75: Double, val p90: Double)
+
+    private fun computeThresholds(sortedValues: List<Double>): Thresholds {
+        if (sortedValues.size < 4) {
+            val max = sortedValues.maxOrNull() ?: 0.0
+            return Thresholds(max, max, max)
+        }
+
+        fun getPercentile(p: Double): Double {
+            val index = ((sortedValues.size - 1) * p).roundToInt()
+            return sortedValues[index.coerceIn(sortedValues.indices)]
+        }
+
+        return Thresholds(
+            p50 = getPercentile(0.50), // Median spend
+            p75 = getPercentile(0.75), // High spend
+            p90 = getPercentile(0.90)  // Very high spend
+        )
+    }
+
+    private fun getHeatLevel(amount: Double, t: Thresholds): Int {
+        if (amount <= 0.0) return 0
+        return when {
+            amount <= t.p50 -> 1 // Low intensity
+            amount <= t.p75 -> 2 // Medium intensity
+            amount <= t.p90 -> 3 // High intensity
+            else -> 4            // Max intensity
+        }
+    }
+
+    private fun updateState(transform: (HistoryState) -> HistoryState) {
+        _state.update(transform)
     }
 }

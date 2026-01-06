@@ -22,6 +22,6 @@ data class Currency(
             USD, EUR, GBP, INR, JPY, AUD, CAD, CNY
         )
 
-        fun fromCode(code: String): Currency? = getAll().find { it.code == code }
+        fun fromCode(code: String): Currency? = getAll().find { it.code == code } ?: INR
     }
 }

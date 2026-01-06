@@ -29,15 +29,51 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioRadius
+import com.bluemix.cashio.ui.theme.CashioSpacing
 
-enum class StateCardVariant { LOADING, EMPTY, ERROR, INFO }
+/**
+ * Visual styles for the state card.
+ */
+enum class StateCardVariant {
+    /** Shows a centered circular progress indicator. */
+    LOADING,
 
+    /** Standard layout for empty states or information. */
+    EMPTY,
+
+    /** Styled with error container colors to indicate failure. */
+    ERROR
+}
+
+/**
+ * Configuration for an action button displayed at the bottom of the card.
+ *
+ * @property text The button label.
+ * @property onClick The callback when the button is clicked.
+ * @property outlined If true, renders an [OutlinedButton]; otherwise, a filled [Button].
+ */
 data class StateCardAction(
     val text: String,
     val onClick: () -> Unit,
     val outlined: Boolean = false
 )
 
+/**
+ * A versatile card component used to display UI states (Loading, Empty, Error).
+ *
+ * It supports optional animation on entry, custom emojis, and action buttons.
+ *
+ * @param variant The visual mode of the card ([StateCardVariant.LOADING], [StateCardVariant.EMPTY], etc.).
+ * @param title Optional headline text.
+ * @param message Optional body text explaining the state.
+ * @param emoji Optional large emoji displayed at the top (e.g., "😕" for errors).
+ * @param height Optional fixed height. If null, the card wraps its content.
+ * @param action Optional CTA button configuration.
+ * @param animated If true, the card enters the screen with a fade+scale animation.
+ * @param contentPadding Padding applied inside the card container.
+ */
 @Composable
 fun StateCard(
     variant: StateCardVariant,
@@ -48,22 +84,28 @@ fun StateCard(
     action: StateCardAction? = null,
     animated: Boolean = false,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(20.dp)
+    contentPadding: PaddingValues = PaddingValues(CashioPadding.card)
 ) {
     val visible = remember { mutableStateOf(!animated) }
-    LaunchedEffect(animated) { if (animated) visible.value = true }
 
+    // Trigger animation if enabled
+    LaunchedEffect(animated) {
+        if (animated) visible.value = true
+    }
+
+    // Determine colors based on variant
     val (bg, fg) = when (variant) {
         StateCardVariant.ERROR -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
         else -> MaterialTheme.colorScheme.surface to MaterialTheme.colorScheme.onSurface
     }
 
-    val card = @Composable {
+    // Content composable definition
+    val cardContent = @Composable {
         Surface(
             modifier = modifier
                 .fillMaxWidth()
                 .then(if (height != null) Modifier.height(height) else Modifier),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(CashioRadius.medium),
             color = bg,
             tonalElevation = 2.dp,
             shadowElevation = 2.dp
@@ -73,7 +115,10 @@ fun StateCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .then(if (height != null) Modifier.height(height) else Modifier.padding(24.dp)),
+                            .then(
+                                if (height != null) Modifier.height(height)
+                                else Modifier.padding(CashioSpacing.huge)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -84,7 +129,7 @@ fun StateCard(
                     Column(
                         modifier = Modifier.padding(contentPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(CashioSpacing.compact)
                     ) {
                         if (!emoji.isNullOrBlank()) {
                             Text(text = emoji, fontSize = 44.sp)
@@ -108,11 +153,17 @@ fun StateCard(
                         }
 
                         action?.let { act ->
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(CashioSpacing.xs))
                             if (act.outlined) {
-                                OutlinedButton(onClick = act.onClick) { Text(act.text) }
+                                OutlinedButton(
+                                    onClick = act.onClick,
+                                    shape = RoundedCornerShape(CashioRadius.mediumSmall)
+                                ) { Text(act.text) }
                             } else {
-                                Button(onClick = act.onClick) { Text(act.text) }
+                                Button(
+                                    onClick = act.onClick,
+                                    shape = RoundedCornerShape(CashioRadius.mediumSmall)
+                                ) { Text(act.text) }
                             }
                         }
                     }
@@ -121,13 +172,16 @@ fun StateCard(
         }
     }
 
+    // Render with or without animation wrapper
     if (animated) {
         AnimatedVisibility(
             visible = visible.value,
             enter = fadeIn() + scaleIn(),
             label = "StateCardAnimatedVisibility"
-        ) { card() }
+        ) {
+            cardContent()
+        }
     } else {
-        card()
+        cardContent()
     }
 }

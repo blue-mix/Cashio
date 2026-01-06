@@ -1,5 +1,6 @@
 package com.bluemix.cashio.ui.components.defaults
 
+// Importing your design tokens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,14 +13,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioShapes
 
 /**
  * Central defaults for all "Card-like" surfaces in the app.
- * Keep these consistent to avoid UI drift across screens.
+ * Now linked to the Cashio Theme tokens.
  */
 object CashioCardDefaults {
-    val CornerRadius: Dp = 16.dp
-    val ContentPadding: Dp = 16.dp
+    // Linked to your predefined shapes/padding
+    val CornerRadius: Dp = CashioShapes.card
+    val ContentPadding: Dp = CashioPadding.card
 
     val BorderWidth: Dp = 1.dp
     const val BorderAlpha: Float = 0.12f
@@ -28,17 +32,11 @@ object CashioCardDefaults {
     val ShadowElevation: Dp = 2.dp
 }
 
-/**
- * App-wide Card wrapper.
- *
- * Notes:
- * - If clickable, prefer Surface(onClick) so ripple + semantics work properly.
- * - Content padding is handled internally to keep screens consistent.
- */
 @Composable
 fun CashioCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    // Uses the central padding from defaults
     padding: PaddingValues = PaddingValues(all = CashioCardDefaults.ContentPadding),
     cornerRadius: Dp = CashioCardDefaults.CornerRadius,
     showBorder: Boolean = true,
@@ -52,7 +50,6 @@ fun CashioCard(
             BorderStroke(
                 width = CashioCardDefaults.BorderWidth,
                 color = MaterialTheme.colorScheme.outline.copy(alpha = CashioCardDefaults.BorderAlpha)
-                // if you have it: outlineVariant
             )
         } else null
 
@@ -65,8 +62,6 @@ fun CashioCard(
             modifier = modifier,
             shape = shape,
             color = containerColor,
-            tonalElevation = CashioCardDefaults.TonalElevation,
-            shadowElevation = CashioCardDefaults.ShadowElevation,
             border = border,
             onClick = onClick,
             content = body
@@ -76,8 +71,6 @@ fun CashioCard(
             modifier = modifier,
             shape = shape,
             color = containerColor,
-            tonalElevation = CashioCardDefaults.TonalElevation,
-            shadowElevation = CashioCardDefaults.ShadowElevation,
             border = border,
             content = body
         )

@@ -18,7 +18,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -33,6 +32,8 @@ import com.bluemix.cashio.ui.components.defaults.CashioTopBar
 import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
 import com.bluemix.cashio.ui.components.defaults.TopBarAction
 import com.bluemix.cashio.ui.components.defaults.TopBarIcon
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -74,17 +75,18 @@ fun SettingsScreen(
                 icon = TopBarIcon.Vector(Icons.Default.ChevronLeft),
                 onClick = onNavigateBack
             ),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+            modifier = Modifier.padding(horizontal = CashioPadding.screen) // 16.dp -> screen gutter
         )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            // Consistent gap between different setting groups
+            verticalArrangement = Arrangement.spacedBy(CashioSpacing.default), // 16.dp -> default
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 8.dp,
-                bottom = bottomInset + 72.dp
+                start = CashioPadding.screen,
+                end = CashioPadding.screen,
+                top = CashioSpacing.small, // 8.dp -> small
+                bottom = bottomInset + CashioSpacing.massive // Adding massive (32dp) for FAB/Safe room
             )
         ) {
             item {

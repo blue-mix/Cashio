@@ -3,6 +3,7 @@ package com.bluemix.cashio.data.local.entity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import io.realm.kotlin.types.RealmObject
+import io.realm.kotlin.types.annotations.Ignore
 import io.realm.kotlin.types.annotations.PrimaryKey
 
 /**
@@ -20,7 +21,7 @@ class CategoryEntity : RealmObject {
 
     var isDefault: Boolean = false
 
-    // Helper to convert to/from Compose Color
+    @Ignore
     var color: Color
         get() = Color(colorArgb)
         set(value) {

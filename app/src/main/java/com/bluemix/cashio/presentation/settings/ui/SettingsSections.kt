@@ -15,13 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.presentation.settings.ui.PermissionRow
 import com.bluemix.cashio.presentation.settings.ui.SettingsLinkRow
 import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.components.defaults.CashioIcon
+import com.bluemix.cashio.ui.theme.CashioSpacing
 
 @Composable
 fun PermissionsSection(
@@ -31,14 +31,10 @@ fun PermissionsSection(
     onNotificationClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    CashioCard(
-        modifier = modifier.fillMaxWidth(),
-        padding = PaddingValues(16.dp),
-        cornerRadius = 16.dp
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    CashioCard(modifier = modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.default)) {
             Text(
-                text = "Data Sources",
+                "Data Sources",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -54,7 +50,7 @@ fun PermissionsSection(
             PermissionRow(
                 icon = CashioIcon.Drawable(R.drawable.notificationbell),
                 title = "Notification Access",
-                description = "Reads UPI/banking notifications for real-time tracking.",
+                description = "Reads banking notifications for real-time tracking.",
                 granted = notificationGranted,
                 onClick = onNotificationClick
             )
@@ -68,28 +64,21 @@ fun AppearanceSection(
     onDarkModeToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    CashioCard(
-        modifier = modifier.fillMaxWidth(),
-        padding = PaddingValues(16.dp),
-        cornerRadius = 16.dp
-    ) {
+    CashioCard(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
                     shape = androidx.compose.foundation.shape.CircleShape,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                 ) {
-                    Box(
-                        modifier = Modifier.size(48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                         CashioIcon(
                             icon = CashioIcon.Drawable(R.drawable.pallete),
                             tint = MaterialTheme.colorScheme.primary,
@@ -98,25 +87,21 @@ fun AppearanceSection(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xs)) {
                     Text(
-                        text = "Appearance",
+                        "Appearance",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = if (isDarkMode) "Dark mode is ON" else "Light mode is ON",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Start
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Switch(
-                checked = isDarkMode,
-                onCheckedChange = onDarkModeToggle
-            )
+            Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
         }
     }
 }

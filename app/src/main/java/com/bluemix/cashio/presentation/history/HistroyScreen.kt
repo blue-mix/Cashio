@@ -1,10 +1,12 @@
 package com.bluemix.cashio.presentation.history
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -17,16 +19,30 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluemix.cashio.ui.components.cards.DayTransactionCard
+import com.bluemix.cashio.ui.components.cards.StateCard
+import com.bluemix.cashio.ui.components.cards.StateCardAction
+import com.bluemix.cashio.ui.components.cards.StateCardVariant
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 import java.time.LocalDate
 
-private val ScreenPadding = 16.dp
-private val ItemVerticalPadding = 4.dp
-
+/**
+ * The main History screen displaying a chronological log of transactions.
+ *
+ * Layout Structure:
+ * 1. **Top Bar:** Shows the currently selected date context and a "Jump to Today" action.
+ * 2. **Sticky Header:** A horizontal calendar that stays pinned to the top. It visualizes spending intensity (heatmap) and allows filtering by date.
+ * 3. **Transaction List:** A grouped list of transactions, organized by day.
+ *
+ * Interaction Logic:
+ * - Clicking a date on the calendar filters the list to show only that day.
+ * - Clicking "Today" clears filters and scrolls the list to the top.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
     onTransactionClick: (String) -> Unit,
@@ -52,21 +68,23 @@ fun HistoryScreen(
             onTodayClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 viewModel.onDateClicked(today)
+                // Smoothly scroll back to the top when resetting view
                 scope.launch { listState.animateScrollToItem(0) }
             },
-            modifier = Modifier.padding(horizontal = ScreenPadding)
+            modifier = Modifier.padding(horizontal = CashioPadding.screen)
         )
 
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = bottomInset + ScreenPadding)
+            contentPadding = PaddingValues(bottom = bottomInset + CashioPadding.screen)
         ) {
+            // The Calendar remains visible while scrolling through the list
             stickyHeader {
                 CalendarStickyHeader(
                     listState = listState,
                     expenseTotalByDate = state.expenseTotalByDate,
-                    expenseHeatLevelByDate = state.expenseHeatLevelByDate, // ✅ new
+                    expenseHeatLevelByDate = state.expenseHeatLevelByDate,
                     today = today,
                     selectedDate = selectedDate,
                     onDayClick = { date ->
@@ -78,17 +96,29 @@ fun HistoryScreen(
 
             val dayGroups = state.visibleDayGroups
 
+            // Render Content based on State (Loading -> Error -> Empty -> Data)
             when {
                 state.isLoading -> {
-                    item { CenterMessage("Loading...", Modifier.padding(24.dp)) }
+                    item {
+                        StateCard(
+                            variant = StateCardVariant.LOADING,
+                            modifier = Modifier.padding(CashioSpacing.huge),
+                            animated = true
+                        )
+                    }
                 }
 
                 state.errorMessage != null -> {
                     item {
-                        CenterMessage(
-                            text = state.errorMessage ?: "Something went wrong",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(24.dp)
+                        StateCard(
+                            variant = StateCardVariant.ERROR,
+                            title = "Error loading history",
+                            message = state.errorMessage ?: "Something went wrong",
+                            action = StateCardAction(
+                                text = "Retry",
+                                onClick = { viewModel.onDateClicked(selectedDate ?: today) }
+                            ),
+                            modifier = Modifier.padding(CashioPadding.screen)
                         )
                     }
                 }
@@ -99,7 +129,10 @@ fun HistoryScreen(
                             selectedDate = selectedDate,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = ScreenPadding, vertical = 24.dp)
+                                .padding(
+                                    horizontal = CashioPadding.screen,
+                                    vertical = CashioSpacing.huge
+                                )
                         )
                     }
                 }
@@ -117,8 +150,11 @@ fun HistoryScreen(
                                 onTransactionClick(id)
                             },
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = ScreenPadding, vertical = ItemVerticalPadding)
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = CashioPadding.screen,
+                                    vertical = CashioSpacing.xs
+                                )
                         )
                     }
                 }

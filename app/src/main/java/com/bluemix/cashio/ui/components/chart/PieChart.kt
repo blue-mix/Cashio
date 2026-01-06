@@ -33,21 +33,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bluemix.cashio.core.format.CashioFormat
 import com.bluemix.cashio.ui.components.defaults.CashioCard
+import com.bluemix.cashio.ui.theme.CashioRadius
 import com.bluemix.cashio.ui.theme.CashioSemantic
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlin.math.roundToInt
 
 /**
- * Circular spending overview showing:
- * - total spending
- * - expense vs remaining ratio
- * - top spending category
+ * A dashboard summary card featuring a custom Ring Chart.
+ *
+ * Visualizes the ratio of Expenses vs. Remaining Budget (or Income).
+ * Also displays the highest spending category for quick insight.
+ *
+ * @param totalAmount The central figure displayed inside the ring.
+ * @param periodLabel Context label (e.g., "This Month", "Today").
+ * @param expenseRatio Float between 0.0 and 1.0 representing the expense percentage.
+ * @param topCategory Name of the category with the highest spend.
+ * @param topCategoryAmount Amount spent in the top category.
  */
 @Composable
 fun SpendingOverviewCard(
     totalAmount: Double,
     periodLabel: String,
-    expenseRatio: Float,              // value between 0f–1f
+    expenseRatio: Float,
     topCategory: String,
     topCategoryAmount: Double,
     topCategoryIcon: String = "💡",
@@ -57,13 +66,10 @@ fun SpendingOverviewCard(
     modifier: Modifier = Modifier
 ) {
     val expenseRatioClamped = expenseRatio.coerceIn(0f, 1f)
-
     val expenseRingColor = CashioSemantic.ExpenseRed
     val remainingRingColor = MaterialTheme.colorScheme.primary
 
-    CashioCard(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    CashioCard(modifier = modifier.fillMaxWidth()) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
             // ───────────────────── Ring Chart ─────────────────────
@@ -71,20 +77,23 @@ fun SpendingOverviewCard(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(220.dp)
-                    .padding(vertical = 16.dp)
+                    .padding(vertical = CashioSpacing.default)
             ) {
                 Canvas(modifier = Modifier.size(220.dp)) {
-                    val strokeWidth = 12.dp.toPx()
+                    // Stroke aligns to grid (12dp)
+                    val strokeWidth = CashioSpacing.medium.toPx()
                     val radius = (size.minDimension - strokeWidth) / 2
                     val center = Offset(size.width / 2, size.height / 2)
 
+                    // Calculate gaps to prevent arcs from touching cleanly
                     val gapDegrees = 4f
-                    val capDegrees =
-                        ((180 * strokeWidth) / (Math.PI * radius)).toFloat()
+
+                    // Calculate visual correction for Round Caps so arcs don't overlap
+                    val capDegrees = ((180 * strokeWidth) / (Math.PI * radius)).toFloat()
 
                     val expenseSweep = 360f * expenseRatioClamped
 
-                    // Expense arc
+                    // Draw Expense Arc (Red)
                     if (expenseSweep > 0f) {
                         drawArc(
                             color = expenseRingColor,
@@ -97,10 +106,8 @@ fun SpendingOverviewCard(
                         )
                     }
 
-                    // Remaining arc
-                    val remainingSweep =
-                        360f - expenseSweep - gapDegrees - capDegrees
-
+                    // Draw Remaining Arc (Primary Color)
+                    val remainingSweep = 360f - expenseSweep - gapDegrees - capDegrees
                     if (remainingSweep > 0f) {
                         drawArc(
                             color = remainingRingColor,
@@ -114,16 +121,16 @@ fun SpendingOverviewCard(
                     }
                 }
 
-                // Center Text
+                // Center Content
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = periodLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(CashioSpacing.tiny))
                     Text(
-                        text = "$currencySymbol${"%.2f".format(totalAmount)}",
+                        text = CashioFormat.money(totalAmount, currencySymbol),
                         style = MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 32.sp
@@ -134,11 +141,11 @@ fun SpendingOverviewCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(CashioSpacing.xl))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(CashioSpacing.default))
 
-            // ───────────────────── Top Category ─────────────────────
+            // ───────────────────── Top Category Insight ─────────────────────
             Column {
                 Text(
                     text = "Top Spending",
@@ -146,19 +153,19 @@ fun SpendingOverviewCard(
                     fontWeight = FontWeight.SemiBold
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(CashioSpacing.medium))
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(CashioRadius.small))
                         .clickable(onClick = onTopCategoryClick)
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = CashioSpacing.small),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -186,17 +193,17 @@ fun SpendingOverviewCard(
                     }
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.small),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "$currencySymbol${"%.2f".format(topCategoryAmount)}",
+                            text = CashioFormat.money(topCategoryAmount, currencySymbol),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "View category",
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.size(20.dp)
                         )

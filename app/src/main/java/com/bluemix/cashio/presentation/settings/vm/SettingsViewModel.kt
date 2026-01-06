@@ -29,39 +29,43 @@ class SettingsViewModel(
 
     private fun observePreferences() {
         viewModelScope.launch {
-            userPreferences.selectedCurrency
-                .distinctUntilChanged()
-                .collect { code ->
-                    val currency = Currency.Companion.fromCode(code) ?: Currency.Companion.USD
-                    _state.update { it.copy(selectedCurrency = currency) }
-                }
-        }
+            // Observe Currency changes
+            launch {
+                userPreferences.selectedCurrency
+                    .distinctUntilChanged()
+                    .collect { code ->
+                        // Fallback to USD if parsing fails
+                        val currency = Currency.fromCode(code) ?: Currency.USD
+                        updateState { it.copy(selectedCurrency = currency) }
+                    }
+            }
 
-        viewModelScope.launch {
-            userPreferences.darkModeEnabled
-                .distinctUntilChanged()
-                .collect { enabled ->
-                    _state.update { it.copy(darkModeEnabled = enabled) }
-                }
+            // Observe Dark Mode changes
+            launch {
+                userPreferences.darkModeEnabled
+                    .distinctUntilChanged()
+                    .collect { enabled ->
+                        updateState { it.copy(darkModeEnabled = enabled) }
+                    }
+            }
         }
     }
 
-    fun refreshPermissionStatus(
-        smsGranted: Boolean,
-        notificationGranted: Boolean
-    ) {
-        val old = _state.value
-        val changed = old.smsPermissionGranted != smsGranted ||
-                old.notificationAccessGranted != notificationGranted
+    /* ------------------------- Actions ------------------------- */
 
-        _state.update {
-            it.copy(
-                smsPermissionGranted = smsGranted,
-                notificationAccessGranted = notificationGranted
-            )
-        }
+    fun refreshPermissionStatus(smsGranted: Boolean, notificationGranted: Boolean) {
+        val old = state.value
+        val changed =
+            old.smsPermissionGranted != smsGranted || old.notificationAccessGranted != notificationGranted
 
         if (changed) {
+            updateState {
+                it.copy(
+                    smsPermissionGranted = smsGranted,
+                    notificationAccessGranted = notificationGranted
+                )
+            }
+            // Sync with local storage for persistence if needed elsewhere
             viewModelScope.launch {
                 userPreferences.setSmsPermission(smsGranted)
                 userPreferences.setNotificationPermission(notificationGranted)
@@ -71,35 +75,52 @@ class SettingsViewModel(
 
     fun setDarkMode(enabled: Boolean) {
         viewModelScope.launch {
+            // We set the preference, and rely on observePreferences() to update the state boolean
             userPreferences.setDarkModeEnabled(enabled)
-            _state.update { it.copy(message = SettingsMessage.Success("Theme updated")) }
+            showMessage(SettingsMessage.Success(if (enabled) "Dark mode enabled" else "Light mode enabled"))
         }
     }
 
     fun changeCurrency(currency: Currency) {
         viewModelScope.launch {
             userPreferences.setSelectedCurrency(currency.code)
-            _state.update {
-                it.copy(message = SettingsMessage.Success("Currency updated to ${currency.name}"))
-            }
+            showMessage(SettingsMessage.Success("Currency updated to ${currency.name}"))
         }
     }
 
     fun loadKeywordMappings() {
         viewModelScope.launch {
-            _state.update { it.copy(keywordMappings = UiState.Loading) }
+            updateState { it.copy(keywordMappings = UiState.Loading) }
 
             when (val result = getKeywordMappings()) {
-                is Result.Success -> _state.update { it.copy(keywordMappings = UiState.Success(result.data)) }
-                is Result.Error -> _state.update {
-                    it.copy(keywordMappings = UiState.Error(result.message ?: "Failed to load keyword mappings"))
+                is Result.Success -> updateState {
+                    it.copy(keywordMappings = UiState.Success(result.data))
                 }
+
+                is Result.Error -> updateState {
+                    it.copy(
+                        keywordMappings = UiState.Error(
+                            result.message ?: "Failed to load keyword mappings"
+                        )
+                    )
+                }
+
                 else -> Unit
             }
         }
     }
 
     fun dismissMessage() {
-        _state.update { it.copy(message = null) }
+        updateState { it.copy(message = null) }
+    }
+
+    /* ------------------------- Helpers ------------------------- */
+
+    private fun showMessage(msg: SettingsMessage) {
+        updateState { it.copy(message = msg) }
+    }
+
+    private fun updateState(transform: (SettingsState) -> SettingsState) {
+        _state.update(transform)
     }
 }

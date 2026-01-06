@@ -2,6 +2,7 @@ package com.bluemix.cashio.presentation.transaction
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -10,12 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,18 +24,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluemix.cashio.presentation.common.UiState
-import com.bluemix.cashio.presentation.transaction.components.TransactionEmptyCard
-import com.bluemix.cashio.presentation.transaction.components.TransactionErrorCard
 import com.bluemix.cashio.presentation.transaction.components.TransactionSearchBar
 import com.bluemix.cashio.presentation.transaction.components.TransactionTypeFilterRow
+import com.bluemix.cashio.ui.components.cards.StateCard
+import com.bluemix.cashio.ui.components.cards.StateCardAction
+import com.bluemix.cashio.ui.components.cards.StateCardVariant
 import com.bluemix.cashio.ui.components.cards.TransactionListItem
 import com.bluemix.cashio.ui.components.defaults.CashioTopBar
 import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
 import com.bluemix.cashio.ui.components.defaults.TopBarAction
 import com.bluemix.cashio.ui.components.defaults.TopBarIcon
+import com.bluemix.cashio.ui.theme.CashioPadding
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -47,33 +50,37 @@ fun TransactionsScreen(
     val listState = rememberLazyListState()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    ColumnScaffold(
-        top = {
-            CashioTopBar(
-                title = CashioTopBarTitle.Text("Transactions"),
-                leadingAction = TopBarAction(
-                    icon = TopBarIcon.Vector(Icons.Default.Close),
-                    onClick = onNavigateBack
-                ),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
-            )
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        CashioTopBar(
+            title = CashioTopBarTitle.Text("Transactions"),
+            leadingAction = TopBarAction(
+                icon = TopBarIcon.Vector(Icons.Default.Close),
+                onClick = onNavigateBack
+            ),
+            modifier = Modifier.padding(horizontal = CashioPadding.screen)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
             when (val ui = state.transactionsUi) {
                 UiState.Idle, UiState.Loading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    StateCard(variant = StateCardVariant.LOADING, animated = true)
                 }
 
                 is UiState.Error -> {
-                    TransactionErrorCard(
+                    StateCard(
+                        variant = StateCardVariant.ERROR,
+                        title = "Load Failed",
                         message = ui.message,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        onRetry = viewModel::loadAll
+                        action = StateCardAction("Retry", viewModel::loadAll),
+                        modifier = Modifier.padding(CashioPadding.screen)
                     )
                 }
 
@@ -83,12 +90,12 @@ fun TransactionsScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(CashioSpacing.medium), // 12dp
                         contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 8.dp,
-                            bottom = navBarPadding + 16.dp + 72.dp
+                            start = CashioPadding.screen,
+                            end = CashioPadding.screen,
+                            top = CashioSpacing.small,
+                            bottom = navBarPadding + CashioSpacing.massive // Space for bottom nav/breathing room
                         )
                     ) {
                         item {
@@ -127,12 +134,13 @@ fun TransactionsScreen(
 
                         if (filtered.isEmpty()) {
                             item {
-                                TransactionEmptyCard(
+                                StateCard(
+                                    variant = StateCardVariant.EMPTY,
+                                    emoji = if (state.query.isBlank()) "🧾" else "🔍",
                                     title = if (state.query.isBlank()) "No transactions yet" else "No matches",
-                                    subtitle = if (state.query.isBlank())
+                                    message = if (state.query.isBlank())
                                         "Once you add or parse transactions, they’ll show up here."
-                                    else "Try a different keyword.",
-                                    modifier = Modifier.fillMaxWidth()
+                                    else "Try a different keyword."
                                 )
                             }
                         } else {
@@ -144,9 +152,6 @@ fun TransactionsScreen(
                                     dateTime = tx.date,
                                     categoryIcon = tx.category.icon,
                                     categoryColor = tx.category.color,
-                                    showCategoryIcon = true,
-                                    showChevron = true,
-                                    showDate = true,
                                     onClick = { onTransactionClick(tx.id) }
                                 )
                             }
@@ -155,16 +160,5 @@ fun TransactionsScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ColumnScaffold(
-    top: @Composable () -> Unit,
-    content: @Composable () -> Unit
-) {
-    androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
-        top()
-        content()
     }
 }

@@ -31,7 +31,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bluemix.cashio.ui.theme.CashioPadding
 import com.bluemix.cashio.ui.theme.CashioSemantic
+import com.bluemix.cashio.ui.theme.CashioSpacing
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.core.CalendarDay
@@ -43,8 +45,19 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
-private val ScreenPadding = 16.dp
-
+/**
+ * A collapsible/sticky calendar header for the History screen.
+ *
+ * Features:
+ * 1. **Scroll Awareness:** Monitors [listState] to animate elevation/shadow when the user
+ * scrolls the transaction list beneath it, mimicking a sticky header.
+ * 2. **Heat Map:** Visualizes daily spending intensity using [expenseHeatLevelByDate].
+ *
+ * @param listState State of the transaction list below to trigger elevation changes.
+ * @param expenseTotalByDate Map of Date -> Total Amount (used for dot indicators).
+ * @param expenseHeatLevelByDate Map of Date -> Intensity (0-4) for background coloring.
+ * @param selectedDate The currently active filter date.
+ */
 @Composable
 fun CalendarStickyHeader(
     listState: LazyListState,
@@ -56,13 +69,13 @@ fun CalendarStickyHeader(
 ) {
     val (calendarState, weekDays) = rememberHistoryCalendarStateAndWeekDays()
 
+    // Determine if the content below has scrolled, requiring the header to "lift" visually.
     val isScrolled by remember(listState) {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
         }
     }
 
-    // Finance UX: tight + controlled (no bouncy elevation)
     val elevation by animateDpAsState(
         targetValue = if (isScrolled) 6.dp else 0.dp,
         animationSpec = spring(
@@ -87,7 +100,7 @@ fun CalendarStickyHeader(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = ScreenPadding)
+                .padding(horizontal = CashioPadding.screen)
         ) {
             HorizontalCalendar(
                 state = calendarState,
@@ -107,27 +120,9 @@ fun CalendarStickyHeader(
                 }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(CashioSpacing.medium))
         }
     }
-}
-
-@Composable
-private fun rememberHistoryCalendarStateAndWeekDays():
-        Pair<com.kizitonwose.calendar.compose.CalendarState, List<DayOfWeek>> {
-    val currentMonth = remember { YearMonth.now() }
-    val startMonth = remember(currentMonth) { currentMonth.minusMonths(12) }
-    val endMonth = remember(currentMonth) { currentMonth.plusMonths(1) }
-    val weekDays = remember { daysOfWeek() }
-
-    val calendarState = rememberCalendarState(
-        startMonth = startMonth,
-        endMonth = endMonth,
-        firstVisibleMonth = currentMonth,
-        firstDayOfWeek = weekDays.first()
-    )
-
-    return calendarState to weekDays
 }
 
 @Composable
@@ -135,12 +130,12 @@ private fun MonthHeader(daysOfWeek: List<DayOfWeek>) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp, horizontal = 4.dp)
+            .padding(vertical = CashioSpacing.medium, horizontal = CashioSpacing.xs)
     ) {
         val locale = Locale.getDefault()
         daysOfWeek.forEach { dow ->
             Text(
-                text = dow.getDisplayName(TextStyle.NARROW, locale), // better than take(1)
+                text = dow.getDisplayName(TextStyle.NARROW, locale),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium,
                 fontSize = 12.sp,
@@ -152,6 +147,18 @@ private fun MonthHeader(daysOfWeek: List<DayOfWeek>) {
     }
 }
 
+/**
+ * Renders a single day cell in the calendar.
+ *
+ * Visual Hierarchy (Priority High to Low):
+ * 1. **Selected:** Solid Primary color.
+ * 2. **Today:** Primary Container color (if not selected).
+ * 3. **Heat Level:** Background tint indicating spending intensity (Level 1-4).
+ * 4. **Default:** Transparent.
+ *
+ * Additionally, a small dot indicator appears if there is any spending on that day
+ * but the day is not currently selected.
+ */
 @Composable
 private fun SpendingDay(
     day: CalendarDay,
@@ -165,13 +172,13 @@ private fun SpendingDay(
     val hasSpending = spending > 0
     val cs = MaterialTheme.colorScheme
 
-    // ✅ heatLevel-based background (no magic numbers)
+    // Determine background color based on spending intensity (Heat Map)
     val heatBg: Color? = when {
         !isCurrentMonth || heatLevel == 0 -> null
-        heatLevel == 4 -> cs.errorContainer
-        heatLevel == 3 -> cs.tertiaryContainer
-        heatLevel == 2 -> cs.primaryContainer
-        else -> cs.secondaryContainer // heatLevel == 1
+        heatLevel == 4 -> cs.errorContainer     // High Spend
+        heatLevel == 3 -> cs.tertiaryContainer  // Med-High
+        heatLevel == 2 -> cs.primaryContainer   // Medium
+        else -> cs.secondaryContainer           // Low
     }
 
     val background = when {
@@ -191,7 +198,7 @@ private fun SpendingDay(
     Box(
         modifier = Modifier
             .aspectRatio(1.2f)
-            .padding(2.dp)
+            .padding(CashioSpacing.xxs)
             .clip(CircleShape)
             .background(background)
             .clickable(enabled = isCurrentMonth, onClick = onClick),
@@ -201,15 +208,12 @@ private fun SpendingDay(
             Text(
                 text = day.date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = when {
-                    isSelected -> FontWeight.ExtraBold
-                    isToday && isCurrentMonth -> FontWeight.Bold
-                    else -> FontWeight.SemiBold
-                },
+                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                 fontSize = 13.sp,
                 color = textColor
             )
 
+            // Small dot indicator for spending presence
             if (hasSpending && !isSelected && isCurrentMonth) {
                 val dotColor = when {
                     spending > 1000 -> CashioSemantic.ExpenseRed
@@ -219,11 +223,32 @@ private fun SpendingDay(
 
                 Box(
                     modifier = Modifier
-                        .padding(top = 2.dp)
-                        .size(4.dp)
+                        .padding(top = CashioSpacing.xxs)
+                        .size(CashioSpacing.xs)
                         .background(dotColor, CircleShape)
                 )
             }
         }
     }
+}
+
+/**
+ * Configures the Calendar state with a range of -12 months to +1 month from today.
+ */
+@Composable
+private fun rememberHistoryCalendarStateAndWeekDays():
+        Pair<com.kizitonwose.calendar.compose.CalendarState, List<DayOfWeek>> {
+    val currentMonth = remember { YearMonth.now() }
+    val startMonth = remember(currentMonth) { currentMonth.minusMonths(12) }
+    val endMonth = remember(currentMonth) { currentMonth.plusMonths(1) }
+    val weekDays = remember { daysOfWeek() }
+
+    val calendarState = rememberCalendarState(
+        startMonth = startMonth,
+        endMonth = endMonth,
+        firstVisibleMonth = currentMonth,
+        firstDayOfWeek = weekDays.first()
+    )
+
+    return calendarState to weekDays
 }

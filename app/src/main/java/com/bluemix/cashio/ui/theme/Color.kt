@@ -3,17 +3,9 @@ package com.bluemix.cashio.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /* -------------------------------------------------------------------------- */
-/*  Brand Palette                                                             */
+/* Brand Palette                                                             */
 /* -------------------------------------------------------------------------- */
-/**
- * Core Cashio brand colors.
- * These should NOT change frequently.
- * If branding evolves, update here and let the theme propagate naturally.
- */
-
-
 object CashioBrand {
-
     // Primary brand purple (indigo)
     val Primary = Color(0xFF6356E5)
     val PrimaryDark = Color(0xFF4336C4)
@@ -29,40 +21,34 @@ object CashioBrand {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Semantic Colors                                                           */
+/* Semantic Colors                                                           */
 /* -------------------------------------------------------------------------- */
-/**
- * Semantic colors communicate meaning.
- * These may be reused across UI, charts, alerts, analytics, etc.
- */
 object CashioSemantic {
+    // Light Mode Semantics (High Contrast)
+    val IncomeGreen = Color(0xFF16A34A)
+    val ExpenseRed = Color(0xFFEF4444)
 
-    val IncomeGreen = Color(0xFF16A34A)          // positive, inflow
-    val ExpenseRed = Color(0xFFEF4444)         // negative, outflow
+    // Dark Mode Semantics (Pastel/Soft for visibility on dark backgrounds)
+    val IncomeGreenDark = Color(0xFF4ADE80) // Lighter green
+    val ExpenseRedDark = Color(0xFFF87171)  // Lighter red
 
     val Warning = Color(0xFFF59E0B)
     val Info = Color(0xFF0EA5E9)
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Neutral Utility Colors                                                     */
+/* Neutral Utility Colors                                                     */
 /* -------------------------------------------------------------------------- */
-/**
- * Neutral colors for borders, dividers, charts, disabled states.
- */
 object CashioNeutral {
-
-    val GrayLight = Color(0xFF9CA3AF)
+    val GrayLight = Color(0xFFE5E7EB)  // Updated to be lighter for dividers
+    val GrayMedium = Color(0xFF9CA3AF)
     val GrayDark = Color(0xFF4B5563)
+    val Scrim = Color.Black.copy(alpha = 0.32f) // Standard scrim
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Material 3 – Light Theme Tokens                                           */
+/* Material 3 – Light Theme Tokens                                           */
 /* -------------------------------------------------------------------------- */
-/**
- * Material color tokens for LIGHT mode.
- * These map brand + semantic colors into Material roles.
- */
 val md_theme_light_primary = CashioBrand.Primary
 val md_theme_light_onPrimary = Color.White
 val md_theme_light_primaryContainer = CashioBrand.PrimarySoft
@@ -86,25 +72,31 @@ val md_theme_light_onErrorContainer = Color(0xFF7F1D1D)
 val md_theme_light_background = Color(0xFFF5F5FA)
 val md_theme_light_onBackground = Color(0xFF111827)
 
+// Surfaces
 val md_theme_light_surface = Color.White
 val md_theme_light_onSurface = Color(0xFF111827)
-
 val md_theme_light_surfaceVariant = Color(0xFFE3E2F2)
 val md_theme_light_onSurfaceVariant = Color(0xFF4B4A65)
 
-val md_theme_light_outline = CashioNeutral.GrayLight
+// NEW: Surface Containers (Crucial for M3 Cards)
+val md_theme_light_surfaceContainerLowest = Color(0xFFFFFFFF)
+val md_theme_light_surfaceContainerLow = Color(0xFFF3F3F8)
+val md_theme_light_surfaceContainer = Color(0xFFEDEDF4)
+val md_theme_light_surfaceContainerHigh = Color(0xFFE7E7EE)
+val md_theme_light_surfaceContainerHighest = Color(0xFFE1E1E8)
+
+// Outlines
+val md_theme_light_outline = CashioNeutral.GrayMedium
+val md_theme_light_outlineVariant = CashioNeutral.GrayLight // For dividers
 
 val md_theme_light_inverseSurface = Color(0xFF18181F)
 val md_theme_light_inverseOnSurface = Color(0xFFF3F4FF)
 val md_theme_light_inversePrimary = Color(0xFFC7C5FF)
+val md_theme_light_scrim = CashioNeutral.Scrim
 
 /* -------------------------------------------------------------------------- */
-/*  Material 3 – Dark Theme Tokens                                            */
+/* Material 3 – Dark Theme Tokens                                            */
 /* -------------------------------------------------------------------------- */
-/**
- * Material color tokens for DARK mode.
- * Designed to avoid purple overload while keeping brand identity.
- */
 val md_theme_dark_primary = Color(0xFFC7C5FF)
 val md_theme_dark_onPrimary = Color(0xFF23206B)
 val md_theme_dark_primaryContainer = Color(0xFF3A378C)
@@ -120,23 +112,33 @@ val md_theme_dark_onTertiary = Color(0xFF2C1F00)
 val md_theme_dark_tertiaryContainer = Color(0xFF4A3700)
 val md_theme_dark_onTertiaryContainer = CashioBrand.TertiarySoft
 
-val md_theme_dark_error = Color(0xFFFCA5A5)
-val md_theme_dark_errorContainer = Color(0xFF7F1D1D)
-val md_theme_dark_onError = Color(0xFF450A0A)
-val md_theme_dark_onErrorContainer = Color(0xFFFFE5E5)
+// Using pastel versions for dark mode readability
+val md_theme_dark_error = CashioSemantic.ExpenseRedDark
+val md_theme_dark_errorContainer = Color(0xFF93000A)
+val md_theme_dark_onError = Color(0xFF690005)
+val md_theme_dark_onErrorContainer = Color(0xFFFFDAD6)
 
 val md_theme_dark_background = Color(0xFF050610)
 val md_theme_dark_onBackground = Color(0xFFE5E7F5)
 
-val md_theme_dark_surface = Color(0xFF0B0C18)   // neutral dark, avoids purple fatigue
+// Surfaces
+val md_theme_dark_surface = Color(0xFF0B0C18)
 val md_theme_dark_onSurface = Color(0xFFE5E7F5)
-
 val md_theme_dark_surfaceVariant = Color(0xFF2D3045)
 val md_theme_dark_onSurfaceVariant = Color(0xFFC5C6DD)
 
+// NEW: Surface Containers (Dark mode hierarchy)
+val md_theme_dark_surfaceContainerLowest = Color(0xFF000000)
+val md_theme_dark_surfaceContainerLow = Color(0xFF0F101E)
+val md_theme_dark_surfaceContainer = Color(0xFF161726)
+val md_theme_dark_surfaceContainerHigh = Color(0xFF212232)
+val md_theme_dark_surfaceContainerHighest = Color(0xFF2C2D3E)
+
+// Outlines
 val md_theme_dark_outline = Color(0xFF8D90AA)
+val md_theme_dark_outlineVariant = Color(0xFF44475F)
 
 val md_theme_dark_inverseSurface = Color(0xFFE5E7F5)
 val md_theme_dark_inverseOnSurface = Color(0xFF111827)
 val md_theme_dark_inversePrimary = CashioBrand.Primary
-
+val md_theme_dark_scrim = CashioNeutral.Scrim

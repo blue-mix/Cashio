@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.realm.kotlin)
-
 }
 
 android {
@@ -19,9 +18,24 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables { useSupportLibrary = true }
+    }
 
-        vectorDrawables {
-            useSupportLibrary = true
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("CASHIO_KEYSTORE")
+            val storePwd = System.getenv("CASHIO_STORE_PASSWORD")
+            val keyAlias = System.getenv("CASHIO_KEY_ALIAS")
+            val keyPwd = System.getenv("CASHIO_KEY_PASSWORD")
+
+            if (!keystorePath.isNullOrEmpty() && !storePwd.isNullOrEmpty() && !keyAlias.isNullOrEmpty() && !keyPwd.isNullOrEmpty()) {
+                storeFile = file(keystorePath)
+                storePassword = storePwd
+                this.keyAlias = keyAlias
+                keyPassword = keyPwd
+            } else {
+                println("⚠️ Release signing keys not found in Env Vars. Skipping signing config.")
+            }
         }
     }
 
@@ -29,14 +43,21 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            isDebuggable = false
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")  // Replace with release config
+
+            if (signingConfigs.getByName("release").storeFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
+
         debug {
             isMinifyEnabled = false
+            isShrinkResources = false
             isDebuggable = true
         }
     }
@@ -68,7 +89,7 @@ android {
 }
 
 dependencies {
-    // Core
+    // --- Core ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -76,41 +97,43 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
 
-    // Compose
+    // --- Compose ---
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    // Extended Icons (Required for Category icons)
     implementation(libs.androidx.compose.material.icons.extended)
 
-    // Navigation
+    // --- Navigation ---
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
 
-    // DataStore
+    // --- DataStore ---
     implementation(libs.androidx.datastore.preferences)
 
-    // Coroutines
+    // --- Coroutines ---
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // Realm Database (choose Realm OR Room, not both)
+    // --- Database (Realm) ---
     implementation(libs.realm.kotlin)
 
-    // Koin DI
+    // --- DI (Koin) ---
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
     implementation(libs.koin.compose.viewmodel)
 
+    // --- UI Libs ---
     implementation(libs.ehsannarmani.compose.charts)
-    // Desugaring
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    // The compose calendar library for Android
     implementation("com.kizitonwose.calendar:compose:2.6.0")
 
-    // Testing
+    // --- Desugaring ---
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // --- Testing ---
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)

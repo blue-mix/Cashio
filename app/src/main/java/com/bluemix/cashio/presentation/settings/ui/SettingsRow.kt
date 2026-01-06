@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.components.defaults.CashioIcon
+import com.bluemix.cashio.ui.theme.CashioRadius
+import com.bluemix.cashio.ui.theme.CashioSpacing
 
 @Composable
 fun PermissionRow(
@@ -42,25 +44,22 @@ fun PermissionRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(CashioRadius.small))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+            .padding(horizontal = CashioSpacing.small, vertical = CashioSpacing.compact),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
             ) {
-                Box(
-                    modifier = Modifier.size(48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                     CashioIcon(
                         icon = icon,
                         tint = MaterialTheme.colorScheme.primary,
@@ -69,7 +68,7 @@ fun PermissionRow(
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
@@ -88,12 +87,7 @@ fun PermissionRow(
         Switch(
             checked = granted,
             onCheckedChange = null,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.onSurface,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.onPrimary)
         )
     }
 }
@@ -104,34 +98,28 @@ fun CategoriesEntryCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    CashioCard(
-        modifier = modifier.fillMaxWidth(),
-        onClick = onClick,
-        padding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-        cornerRadius = 16.dp
-    ) {
+    CashioCard(modifier = modifier.fillMaxWidth(), onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xs)) {
                 Text(
                     "Categories",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (hasCategories) "Manage category list, icons, and colors."
-                    else "No categories found. Create your first category.",
+                    text = if (hasCategories) "Manage category list, icons, and colors." else "No categories found.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             Icon(
                 painter = painterResource(R.drawable.chevron),
-                contentDescription = null
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline
             )
         }
     }
@@ -143,35 +131,28 @@ fun KeywordMappingEntryCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    CashioCard(
-        modifier = modifier.fillMaxWidth(),
-        onClick = onClick,
-        padding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-        cornerRadius = 16.dp
-    ) {
+    CashioCard(modifier = modifier.fillMaxWidth(), onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xs)) {
                 Text(
-                    text = "Keyword Mapping",
+                    "Keyword Mapping",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (hasMappings) "Manage keywords mapped to categories."
-                    else "No mappings yet. Configure auto-categorization rules.",
+                    text = if (hasMappings) "Manage auto-categorization rules." else "No mappings yet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             Icon(
                 painter = painterResource(R.drawable.chevron),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.outline
             )
         }
     }

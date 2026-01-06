@@ -13,7 +13,17 @@ data class Category(
     val isDefault: Boolean = false
 ) {
     companion object {
-        // Default categories for seeding
+
+        fun default(): Category {
+            return Category(
+                id = "other",
+                name = "Other",
+                icon = "📦",
+                color = Color(0xFF9E9E9E), // Grey
+                isDefault = true
+            )
+        }
+
         fun getDefaultCategories(): List<Category> = listOf(
             // Food & Dining
             Category(

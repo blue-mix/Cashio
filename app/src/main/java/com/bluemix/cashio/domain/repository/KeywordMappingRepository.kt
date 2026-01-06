@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
  * Repository interface for KeywordMapping operations
  */
 interface KeywordMappingRepository {
+    suspend fun seedDefaults(): Result<Boolean>
 
     /**
      * Observe all keyword mappings as Flow
