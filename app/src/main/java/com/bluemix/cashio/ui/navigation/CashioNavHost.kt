@@ -1,5 +1,6 @@
 package com.bluemix.cashio.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -52,7 +53,6 @@ import com.bluemix.cashio.presentation.home.DashboardScreen
 import com.bluemix.cashio.presentation.keyword.KeywordMappingScreen
 import com.bluemix.cashio.presentation.onboarding.OnboardingScreen
 import com.bluemix.cashio.presentation.settings.ui.SettingsScreen
-import com.bluemix.cashio.presentation.splash.SplashScreen
 import com.bluemix.cashio.presentation.transaction.TransactionDetailsScreen
 import com.bluemix.cashio.presentation.transaction.TransactionsScreen
 
@@ -173,8 +173,56 @@ fun CashioNavHost(
         ) {
             NavHost(
                 navController = navController,
-                startDestination = startDestination
-            ) {
+                startDestination = startDestination,
+                enterTransition = {
+                    if (isTabNav(initialState.destination.route, targetState.destination.route)) {
+                        fadeIn(animationSpec = tween(300)) // Tab switching: Just fade
+                    } else {
+                        // Drill down: Slide in from Right
+                        slideIntoContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                            animationSpec = tween(300)
+                        )
+                    }
+                },
+                // 2. Global Exit Transition (Old screen disappearing)
+                exitTransition = {
+                    if (isTabNav(initialState.destination.route, targetState.destination.route)) {
+                        fadeOut(animationSpec = tween(300))
+                    } else {
+                        // Drill down: Current screen slides out to Left (slightly slower for depth)
+                        slideOutOfContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                            animationSpec = tween(300)
+                        ) + fadeOut(tween(200)) // Add fade to make it softer
+                    }
+                },
+                // 3. Pop Enter (Going Back to this screen)
+                popEnterTransition = {
+                    if (isTabNav(initialState.destination.route, targetState.destination.route)) {
+                        fadeIn(animationSpec = tween(300))
+                    } else {
+                        // Back: Slide in from Left
+                        slideIntoContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(300)
+                        )
+                    }
+                },
+                // 4. Pop Exit (This screen is being removed via Back)
+                popExitTransition = {
+                    if (isTabNav(initialState.destination.route, targetState.destination.route)) {
+                        fadeOut(animationSpec = tween(300))
+                    } else {
+                        // Back: Slide out to Right
+                        slideOutOfContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(300)
+                        )
+                    }
+                }
+            )
+            {
 
                 // --- Startup Flow ---
 
@@ -189,19 +237,6 @@ fun CashioNavHost(
                         }
                     )
                 }
-
-                composable<Route.Splash> {
-                    SplashScreen(
-                        onFinished = {
-                            navController.navigate(Route.Dashboard) {
-                                popUpTo(Route.Splash) { inclusive = true }
-                                launchSingleTop = true
-                            }
-                        }
-                    )
-                }
-
-                // --- Main Tabs ---
 
                 composable<Route.Dashboard> {
                     DashboardScreen(
@@ -227,7 +262,6 @@ fun CashioNavHost(
 
                 composable<Route.Settings> {
                     SettingsScreen(
-                        onNavigateBack = { navController.popBackStack() },
                         onNavigateToKeywordMapping = { navController.navigate(Route.KeywordMapping) },
                         onNavigateToCategories = { navController.navigate(Route.Categories) }
                     )
@@ -391,6 +425,16 @@ private fun NavHostController.currentDestinationMatches(route: Route): Boolean {
     val target = route::class.qualifiedName ?: return false
     val destination = currentBackStackEntry?.destination ?: return false
     return destination.hierarchy.any { it.route == target }
+}
+
+private fun isTabNav(fromRoute: String?, toRoute: String?): Boolean {
+    val tabs = setOf(
+        Route.Dashboard::class.qualifiedName,
+        Route.History::class.qualifiedName,
+        Route.Analytics::class.qualifiedName,
+        Route.Settings::class.qualifiedName
+    )
+    return tabs.contains(fromRoute) && tabs.contains(toRoute)
 }
 
 /**

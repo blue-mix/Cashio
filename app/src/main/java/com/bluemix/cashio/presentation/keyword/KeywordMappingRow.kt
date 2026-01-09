@@ -20,8 +20,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.ui.components.defaults.CashioCard
-import com.bluemix.cashio.ui.theme.CashioShapes
-import com.bluemix.cashio.ui.theme.CashioSpacing
+import com.bluemix.cashio.ui.components.defaults.CashioShapes
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 
 /**
  * A list item representing a single keyword mapping rule.

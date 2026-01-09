@@ -39,10 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.core.format.CashioFormat
 import com.bluemix.cashio.ui.components.defaults.CashioCard
-import com.bluemix.cashio.ui.theme.CashioPadding
-import com.bluemix.cashio.ui.theme.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioPadding
+import com.bluemix.cashio.ui.components.defaults.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 import com.bluemix.cashio.ui.theme.CashioSemantic
-import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlinx.coroutines.delay
 
 /**

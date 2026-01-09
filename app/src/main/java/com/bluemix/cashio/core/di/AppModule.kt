@@ -8,7 +8,6 @@ import com.bluemix.cashio.presentation.home.DashboardViewModel
 import com.bluemix.cashio.presentation.keyword.KeywordMappingViewModel
 import com.bluemix.cashio.presentation.onboarding.OnboardingViewModel
 import com.bluemix.cashio.presentation.settings.vm.SettingsViewModel
-import com.bluemix.cashio.presentation.splash.SplashViewModel
 import com.bluemix.cashio.presentation.transaction.TransactionViewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -21,7 +20,6 @@ val appModule = module {
     viewModelOf(::CategoriesViewModel)
     viewModelOf(::AnalyticsViewModel)
     viewModelOf(::SettingsViewModel)
-    viewModelOf(::SplashViewModel)
     viewModelOf(::KeywordMappingViewModel)
     viewModelOf(::OnboardingViewModel)
 }

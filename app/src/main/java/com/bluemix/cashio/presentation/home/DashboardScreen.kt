@@ -38,12 +38,12 @@ import com.bluemix.cashio.ui.components.cards.StateCard
 import com.bluemix.cashio.ui.components.cards.StateCardAction
 import com.bluemix.cashio.ui.components.cards.StateCardVariant
 import com.bluemix.cashio.ui.components.cards.TransactionListItem
+import com.bluemix.cashio.ui.components.defaults.CashioPadding
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 import com.bluemix.cashio.ui.components.defaults.CashioTopBar
 import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
 import com.bluemix.cashio.ui.components.defaults.TopBarAction
 import com.bluemix.cashio.ui.components.defaults.TopBarIcon
-import com.bluemix.cashio.ui.theme.CashioPadding
-import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 

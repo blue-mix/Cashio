@@ -23,9 +23,7 @@ class CashioApplication : Application() {
         super.onCreate()
 
         startKoin {
-            // Level.ERROR prevents Koin from flooding Logcat with debug info in production
             androidLogger(Level.ERROR)
-
             androidContext(this@CashioApplication)
 
             modules(

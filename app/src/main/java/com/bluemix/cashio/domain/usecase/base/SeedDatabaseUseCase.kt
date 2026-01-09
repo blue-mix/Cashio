@@ -11,13 +11,16 @@ class SeedDatabaseUseCase(
     private val keywordMappingRepository: KeywordMappingRepository
 ) {
     suspend operator fun invoke(): Result<Unit> = coroutineScope {
-        // Run both seeds in parallel for faster startup
         val catJob = async { categoryRepository.seedDefaults() }
         val kwJob = async { keywordMappingRepository.seedDefaults() }
 
-        catJob.await()
-        kwJob.await()
+        val catRes = catJob.await()
+        val kwRes = kwJob.await()
 
-        Result.Success(Unit)
+        when {
+            catRes is Result.Error -> catRes
+            kwRes is Result.Error -> kwRes
+            else -> Result.Success(Unit)
+        }
     }
 }

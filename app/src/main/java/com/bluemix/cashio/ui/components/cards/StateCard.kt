@@ -29,9 +29,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bluemix.cashio.ui.theme.CashioPadding
-import com.bluemix.cashio.ui.theme.CashioRadius
-import com.bluemix.cashio.ui.theme.CashioSpacing
+import com.bluemix.cashio.ui.components.defaults.CashioPadding
+import com.bluemix.cashio.ui.components.defaults.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 
 /**
  * Visual styles for the state card.

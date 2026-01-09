@@ -10,14 +10,16 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -28,17 +30,12 @@ import com.bluemix.cashio.presentation.settings.AboutSection
 import com.bluemix.cashio.presentation.settings.AppearanceSection
 import com.bluemix.cashio.presentation.settings.PermissionsSection
 import com.bluemix.cashio.presentation.settings.vm.SettingsViewModel
-import com.bluemix.cashio.ui.components.defaults.CashioTopBar
-import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
-import com.bluemix.cashio.ui.components.defaults.TopBarAction
-import com.bluemix.cashio.ui.components.defaults.TopBarIcon
-import com.bluemix.cashio.ui.theme.CashioPadding
-import com.bluemix.cashio.ui.theme.CashioSpacing
+import com.bluemix.cashio.ui.components.defaults.CashioPadding
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SettingsScreen(
-    onNavigateBack: () -> Unit,
     onNavigateToKeywordMapping: () -> Unit,
     onNavigateToCategories: () -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel()
@@ -68,13 +65,18 @@ fun SettingsScreen(
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        CashioTopBar(
-            title = CashioTopBarTitle.Text("Settings"),
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            leadingAction = TopBarAction(
-                icon = TopBarIcon.Vector(Icons.Default.ChevronLeft),
-                onClick = onNavigateBack
-            ),
+        LargeTopAppBar(
+            title = {
+                Text(
+                    modifier = Modifier,
+                    text = "Settings",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(MaterialTheme.colorScheme.background),
             modifier = Modifier.padding(horizontal = CashioPadding.screen) // 16.dp -> screen gutter
         )
 

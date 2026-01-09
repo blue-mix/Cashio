@@ -12,20 +12,22 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluemix.cashio.presentation.analytics.vm.AnalyticsViewModel
-import com.bluemix.cashio.ui.components.defaults.CashioTopBar
-import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
-import com.bluemix.cashio.ui.theme.CashioPadding
-import com.bluemix.cashio.ui.theme.CashioSpacing
+import com.bluemix.cashio.ui.components.defaults.CashioPadding
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -64,10 +66,19 @@ fun AnalyticsScreen(
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        CashioTopBar(
-            title = CashioTopBarTitle.Text("Analytics"),
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = CashioPadding.screen)
+        LargeTopAppBar(
+            title = {
+                Text(
+                    modifier = Modifier,
+                    text = "Analytics",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(MaterialTheme.colorScheme.background),
+            modifier = Modifier.padding(horizontal = CashioPadding.screen) // 16.dp -> screen gutter
         )
 
         LazyColumn(

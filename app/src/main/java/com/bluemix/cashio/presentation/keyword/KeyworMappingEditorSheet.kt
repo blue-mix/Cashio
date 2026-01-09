@@ -26,8 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.bluemix.cashio.domain.model.Category
-import com.bluemix.cashio.ui.theme.CashioRadius
-import com.bluemix.cashio.ui.theme.CashioSpacing
+import com.bluemix.cashio.ui.components.defaults.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 
 /**
  * Bottom sheet form for creating or editing a Keyword Mapping rule.

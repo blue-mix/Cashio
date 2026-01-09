@@ -21,7 +21,7 @@ import com.bluemix.cashio.presentation.settings.ui.PermissionRow
 import com.bluemix.cashio.presentation.settings.ui.SettingsLinkRow
 import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.components.defaults.CashioIcon
-import com.bluemix.cashio.ui.theme.CashioSpacing
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 
 @Composable
 fun PermissionsSection(

@@ -29,8 +29,8 @@ import com.bluemix.cashio.core.format.CashioFormat.toDateLabel
 import com.bluemix.cashio.core.format.CashioFormat.toTimeLabel
 import com.bluemix.cashio.domain.model.TransactionType
 import com.bluemix.cashio.ui.components.defaults.CashioCard
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 import com.bluemix.cashio.ui.theme.CashioSemantic
-import com.bluemix.cashio.ui.theme.CashioSpacing
 import java.time.LocalDateTime
 import kotlin.math.absoluteValue
 

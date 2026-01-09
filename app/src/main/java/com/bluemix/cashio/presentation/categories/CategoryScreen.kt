@@ -63,14 +63,14 @@ import com.bluemix.cashio.ui.components.cards.StateCard
 import com.bluemix.cashio.ui.components.cards.StateCardAction
 import com.bluemix.cashio.ui.components.cards.StateCardVariant
 import com.bluemix.cashio.ui.components.defaults.CashioCard
+import com.bluemix.cashio.ui.components.defaults.CashioPadding
+import com.bluemix.cashio.ui.components.defaults.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioShapes
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 import com.bluemix.cashio.ui.components.defaults.CashioTopBar
 import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
 import com.bluemix.cashio.ui.components.defaults.TopBarAction
 import com.bluemix.cashio.ui.components.defaults.TopBarIcon
-import com.bluemix.cashio.ui.theme.CashioPadding
-import com.bluemix.cashio.ui.theme.CashioRadius
-import com.bluemix.cashio.ui.theme.CashioShapes
-import com.bluemix.cashio.ui.theme.CashioSpacing
 import org.koin.compose.viewmodel.koinViewModel
 
 /**

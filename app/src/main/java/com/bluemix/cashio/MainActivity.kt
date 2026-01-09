@@ -14,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.bluemix.cashio.core.common.Result
 import com.bluemix.cashio.data.local.preferences.UserPreferencesDataStore
+import com.bluemix.cashio.domain.usecase.base.SeedDatabaseUseCase
 import com.bluemix.cashio.ui.navigation.CashioNavHost
 import com.bluemix.cashio.ui.navigation.Route
 import com.bluemix.cashio.ui.theme.CashioTheme
@@ -24,20 +26,30 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
+/** Small compat helper so you don’t need API 26+ doOnEnd() imports. */
+private inline fun ObjectAnimator.doOnEndCompat(crossinline block: () -> Unit) {
+    addListener(object : android.animation.Animator.AnimatorListener {
+        override fun onAnimationStart(animation: android.animation.Animator) = Unit
+        override fun onAnimationEnd(animation: android.animation.Animator) = block()
+        override fun onAnimationCancel(animation: android.animation.Animator) = block()
+        override fun onAnimationRepeat(animation: android.animation.Animator) = Unit
+    })
+}
+
 class MainActivity : ComponentActivity() {
 
     private val userPrefs: UserPreferencesDataStore by inject()
+    private val seedDatabaseUseCase: SeedDatabaseUseCase by inject()
 
-    // null = not ready (keep system splash visible)
-    private val startRoute = MutableStateFlow<Route?>(null)
+    private val appReady = MutableStateFlow(false)
+    private val startRoute = MutableStateFlow<Route>(Route.Onboarding)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
-
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        splash.setKeepOnScreenCondition { startRoute.value == null }
+        splash.setKeepOnScreenCondition { !appReady.value }
 
         splash.setOnExitAnimationListener { splashScreenView ->
             ObjectAnimator.ofFloat(splashScreenView.view, "alpha", 1f, 0f).apply {
@@ -48,8 +60,19 @@ class MainActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
+            // 1) Read onboarding state (fast)
             val completed = userPrefs.isOnboardingCompleted.first()
-            startRoute.value = if (completed) Route.Splash else Route.Onboarding
+            startRoute.value = if (completed) Route.Dashboard else Route.Onboarding
+
+
+            val seeded = userPrefs.isDbSeeded.first()
+            if (!seeded) {
+                val result = seedDatabaseUseCase()
+                if (result is Result.Success) userPrefs.setDbSeeded(true)
+                // If seeding fails, don’t block app forever. Log + proceed.
+            }
+            // 3) Release system splash
+            appReady.value = true
         }
 
         setContent {
@@ -59,16 +82,6 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
-}
-
-/** Small compat helper so you don’t need API 26+ doOnEnd() imports. */
-private inline fun ObjectAnimator.doOnEndCompat(crossinline block: () -> Unit) {
-    addListener(object : android.animation.Animator.AnimatorListener {
-        override fun onAnimationStart(animation: android.animation.Animator) = Unit
-        override fun onAnimationEnd(animation: android.animation.Animator) = block()
-        override fun onAnimationCancel(animation: android.animation.Animator) = block()
-        override fun onAnimationRepeat(animation: android.animation.Animator) = Unit
-    })
 }
 
 @Composable

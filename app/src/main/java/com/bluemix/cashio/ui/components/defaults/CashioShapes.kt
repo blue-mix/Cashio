@@ -1,4 +1,4 @@
-package com.bluemix.cashio.ui.theme
+package com.bluemix.cashio.ui.components.defaults
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp

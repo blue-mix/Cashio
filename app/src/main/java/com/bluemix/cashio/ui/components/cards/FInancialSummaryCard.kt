@@ -46,9 +46,9 @@ import com.bluemix.cashio.R
 import com.bluemix.cashio.core.format.CashioFormat
 import com.bluemix.cashio.ui.components.defaults.CashioCard
 import com.bluemix.cashio.ui.components.defaults.CashioIcon
-import com.bluemix.cashio.ui.theme.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 import com.bluemix.cashio.ui.theme.CashioSemantic
-import com.bluemix.cashio.ui.theme.CashioSpacing
 import kotlin.math.abs
 
 /**

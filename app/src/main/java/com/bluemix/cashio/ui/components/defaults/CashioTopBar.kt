@@ -25,7 +25,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.core.format.CashioFormat.toTopBarLabel
-import com.bluemix.cashio.ui.theme.CashioSpacing
 import java.time.LocalDate
 
 /**

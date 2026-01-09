@@ -17,8 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.presentation.settings.vm.SettingsMessage
-import com.bluemix.cashio.ui.theme.CashioRadius
-import com.bluemix.cashio.ui.theme.CashioSpacing
+import com.bluemix.cashio.ui.components.defaults.CashioRadius
+import com.bluemix.cashio.ui.components.defaults.CashioSpacing
 
 @Composable
 fun SettingsMessageBanner(

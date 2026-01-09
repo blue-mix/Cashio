@@ -19,12 +19,6 @@ sealed interface Route {
     @Serializable
     data object Onboarding : Route
 
-    /**
-     * The splash screen that handles database seeding and initialization.
-     */
-    @Serializable
-    data object Splash : Route
-
     // --- Main Bottom Navigation Tabs ---
 
     @Serializable
