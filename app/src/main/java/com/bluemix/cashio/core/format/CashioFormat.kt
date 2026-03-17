@@ -1,76 +1,78 @@
 package com.bluemix.cashio.core.format
 
+import com.bluemix.cashio.core.format.CashioFormat.compactAmount
+import com.bluemix.cashio.core.format.CashioFormat.money
+import com.bluemix.cashio.domain.model.Currency
 import java.text.NumberFormat
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
-import kotlin.math.abs
 
 /**
- * Central place for formatting + lightweight conversions.
- * Keep it JVM-only (no Compose / Android classes).
+ * Formatting utilities for monetary amounts and dates.
+ *
+ * ## Performance
+ * [DateTimeFormatter] instances are thread-safe and expensive to construct —
+ * they are cached as `companion object` properties and created at most once per
+ * locale change. [NumberFormat] is NOT thread-safe; a fresh instance is obtained
+ * per call via the pooling inside [NumberFormat.getInstance], which is fast.
+ *
+ * ## Money sign convention
+ * Negative amounts (e.g. credits displayed as deltas) retain their sign through
+ * all formatters. Use [money] for full symbol+sign formatting and [compactAmount]
+ * for abbreviated display (e.g. "₹1.2K").
  */
 object CashioFormat {
 
-    /* ---------------------------------------------------------------------- */
-    /* Locale / Zone                                                          */
-    /* ---------------------------------------------------------------------- */
+    // ── Cached formatters ──────────────────────────────────────────────────
+    // DateTimeFormatter is thread-safe; safe to share.
 
-    fun locale(): Locale = Locale.getDefault()
-    fun zoneId(): ZoneId = ZoneId.systemDefault()
+    var _locale: Locale = Locale.getDefault()
+    private var _dateFormatter: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("dd MMM yyyy", _locale)
+    private var _timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm a", _locale)
+    private var _dateTimeFormatter: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", _locale)
+    private var _shortDateFormatter: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("dd MMM", _locale)
+    private var _monthYearFormatter: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMMM yyyy", _locale)
+    private var _dayFormatter: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("EEE, dd MMM", _locale)
 
-    /* ---------------------------------------------------------------------- */
-    /* Date / Time patterns                                                    */
-    /* ---------------------------------------------------------------------- */
+    /**
+     * Call this when the user's locale changes (e.g. in [android.app.Application.onConfigurationChanged])
+     * to refresh cached formatters. Under normal usage the locale is stable for the
+     * process lifetime, so this is rarely needed.
+     */
+    fun invalidateLocale() {
+        _locale = Locale.getDefault()
+        _dateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy", _locale)
+        _timeFormatter = DateTimeFormatter.ofPattern("hh:mm a", _locale)
+        _dateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", _locale)
+        _shortDateFormatter = DateTimeFormatter.ofPattern("dd MMM", _locale)
+        _monthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", _locale)
+        _dayFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM", _locale)
+    }
 
-    private fun dayNameFormatter(locale: Locale) =
-        DateTimeFormatter.ofPattern("EEEE", locale)
+    // ── Date formatting ────────────────────────────────────────────────────
 
-    private fun fullDateFormatter(locale: Locale) =
-        DateTimeFormatter.ofPattern("dd MMM yyyy", locale)
-
-    private fun dateLabelFormatter(locale: Locale) =
-        DateTimeFormatter.ofPattern("dd MMM, yyyy", locale)
-
-    private fun timeFormatter(locale: Locale) =
-        DateTimeFormatter.ofPattern("HH:mm", locale)
-
-    private fun monthLabelFormatter(locale: Locale) =
-        DateTimeFormatter.ofPattern("MMMM", locale)
-
-    private fun topBarDateFormatter(locale: Locale) =
-        DateTimeFormatter.ofPattern("EEE, d MMM", locale)
-
-    /* ---------------------------------------------------------------------- */
-    /* Date helpers                                                            */
-    /* ---------------------------------------------------------------------- */
-
-    fun LocalDate.currentMonthLabel(locale: Locale = locale()): String =
-        this.format(monthLabelFormatter(locale))
-
-    fun LocalDate.toTopBarLabel(locale: Locale = Locale.ENGLISH): String =
-        this.format(topBarDateFormatter(locale))
-
-    fun LocalDate.toFullDate(locale: Locale = locale()): String =
-        this.format(fullDateFormatter(locale))
-
-    fun LocalDate.toDayName(locale: Locale = locale()): String =
-        this.format(dayNameFormatter(locale))
-
-    fun LocalDateTime.toDateLabel(locale: Locale = locale()): String =
-        this.toLocalDate().format(dateLabelFormatter(locale))
-
-    fun LocalDateTime.toTimeLabel(locale: Locale = locale()): String =
-        this.toLocalTime().format(timeFormatter(locale))
+    fun date(dateTime: LocalDateTime): String = _dateFormatter.format(dateTime)
+    fun date(date: LocalDate): String = _dateFormatter.format(date)
+    fun time(dateTime: LocalDateTime): String = _timeFormatter.format(dateTime)
+    fun dateTime(dateTime: LocalDateTime): String = _dateTimeFormatter.format(dateTime)
+    fun shortDate(dateTime: LocalDateTime): String = _shortDateFormatter.format(dateTime)
+    fun shortDate(date: LocalDate): String = _shortDateFormatter.format(date)
+    fun monthYear(dateTime: LocalDateTime): String = _monthYearFormatter.format(dateTime)
+    fun dayOfWeek(dateTime: LocalDateTime): String = _dayFormatter.format(dateTime)
 
     fun LocalDate.toPrettyMonthDay(locale: Locale = Locale.ENGLISH): String {
         val month = this.month.getDisplayName(TextStyle.SHORT, locale)
         return "$month $dayOfMonth${dayOfMonth.ordinalSuffix(locale)}"
     }
+
 
     private fun Int.ordinalSuffix(locale: Locale): String {
         if (!locale.language.equals(Locale.ENGLISH.language, ignoreCase = true)) return ""
@@ -83,67 +85,62 @@ object CashioFormat {
         }
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* Epoch conversions                                                       */
-    /* ---------------------------------------------------------------------- */
-
-    fun LocalDateTime.toEpochMillis(zoneId: ZoneId = zoneId()): Long =
-        this.atZone(zoneId).toInstant().toEpochMilli()
-
-    fun Long.toLocalDate(zoneId: ZoneId = zoneId()): LocalDate =
-        Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
-
-    /* ---------------------------------------------------------------------- */
-    /* Text helpers                                                            */
-    /* ---------------------------------------------------------------------- */
-
-    fun Int.toTransactionCountLabel(): String =
-        "$this transaction${if (this == 1) "" else "s"}"
-
-    /* ---------------------------------------------------------------------- */
-    /* Money formatting                                                        */
-    /* ---------------------------------------------------------------------- */
+    // ── Money formatting ───────────────────────────────────────────────────
 
     /**
-     * Best default: locale-aware grouping + 2 decimals.
-     * If you want always-English formatting, pass Locale.ENGLISH.
+     * Formats [amountPaise] as a locale-aware string with currency symbol.
+     * e.g. `money(150075, Currency.INR)` → "₹1,500.75"
+     *
+     * Sign is preserved — negative values produce e.g. "-₹1,500.75".
      */
-    fun money(
-        value: Double,
-        currencySymbol: String = "₹",
-        locale: Locale = locale()
-    ): String {
-        val nf = NumberFormat.getNumberInstance(locale).apply {
+    fun money(amountPaise: Long, currency: Currency = Currency.INR): String {
+        val value = amountPaise / 100.0
+        val absValue = kotlin.math.abs(value)
+        val sign = if (value < 0) "-" else ""
+        val formatter = NumberFormat.getNumberInstance(_locale).apply {
             minimumFractionDigits = 2
             maximumFractionDigits = 2
         }
-        return currencySymbol + nf.format(value)
+        return "$sign${currency.symbol}${formatter.format(absValue)}"
     }
 
-    /** Compact like 1.2K / 3.4M (good for chips, stats). */
-    fun compactAmount(value: Double): String {
-        val v = abs(value)
-        return when {
-            v >= 1_000_000 -> {
-                val x = v / 1_000_000.0
-                if (x < 10) String.format(Locale.US, "%.1fM", x) else String.format(
-                    Locale.US,
-                    "%.0fM",
-                    x
-                )
-            }
+    /**
+     * Abbreviated money display for tight spaces (charts, heatmap cells).
+     * e.g. `compactAmount(150075, Currency.INR)` → "₹1.5K"
+     *
+     * Sign is preserved — negative values produce e.g. "-₹1.5K".
+     */
+    fun compactAmount(amountPaise: Long, currency: Currency = Currency.INR): String {
+        val value = amountPaise / 100.0
+        val sign = if (value < 0) "-" else ""
+        val abs = kotlin.math.abs(value)
 
-            v >= 1_000 -> {
-                val x = v / 1_000.0
-                if (x < 10) String.format(Locale.US, "%.1fK", x) else String.format(
-                    Locale.US,
-                    "%.0fK",
-                    x
-                )
-            }
-
-            else -> String.format(Locale.US, "%.0f", v)
+        val (formatted, suffix) = when {
+            abs >= 10_000_000.0 -> Pair("%.1f".format(abs / 10_000_000.0), "Cr")
+            abs >= 100_000.0 -> Pair("%.1f".format(abs / 100_000.0), "L")
+            abs >= 1_000.0 -> Pair("%.1f".format(abs / 1_000.0), "K")
+            else -> Pair("%.0f".format(abs), "")
         }
+
+        // Strip redundant ".0" suffix (e.g. "1.0K" → "1K")
+        val trimmed = if (suffix.isNotEmpty() && formatted.endsWith(".0")) {
+            formatted.dropLast(2)
+        } else {
+            formatted
+        }
+
+        return "$sign${currency.symbol}$trimmed$suffix"
     }
 
+    /**
+     * Formats a raw [Double] input value (from user entry) as a money string.
+     * Use [money] for stored paise values wherever possible.
+     */
+    fun moneyFromDouble(amount: Double, currency: Currency = Currency.INR): String =
+        money((amount * 100).toLong(), currency)
+
+    /**
+     * Returns a percentage string, e.g. 0.456 → "45.6%"
+     */
+    fun percentage(ratio: Double): String = "%.1f%%".format(ratio * 100.0)
 }

@@ -4,6 +4,8 @@ import android.app.Application
 import com.bluemix.cashio.core.di.appModule
 import com.bluemix.cashio.core.di.dataModule
 import com.bluemix.cashio.core.di.domainModule
+import com.bluemix.cashio.data.local.database.RealmManager
+import org.koin.android.ext.android.getKoin
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -32,5 +34,7 @@ class CashioApplication : Application() {
                 domainModule
             )
         }
+        val realmManager: RealmManager = getKoin().get()
+        realmManager.open()
     }
 }

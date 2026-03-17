@@ -1,362 +1,3 @@
-//package com.bluemix.cashio.ui.components.cards
-//
-//import androidx.compose.animation.AnimatedVisibility
-//import androidx.compose.animation.fadeIn
-//import androidx.compose.animation.fadeOut
-//import androidx.compose.foundation.background
-//import androidx.compose.foundation.clickable
-//import androidx.compose.foundation.layout.Arrangement
-//import androidx.compose.foundation.layout.Box
-//import androidx.compose.foundation.layout.Column
-//import androidx.compose.foundation.layout.Row
-//import androidx.compose.foundation.layout.Spacer
-//import androidx.compose.foundation.layout.fillMaxWidth
-//import androidx.compose.foundation.layout.height
-//import androidx.compose.foundation.layout.heightIn
-//import androidx.compose.foundation.layout.padding
-//import androidx.compose.foundation.layout.size
-//import androidx.compose.foundation.lazy.LazyColumn
-//import androidx.compose.foundation.lazy.items
-//import androidx.compose.foundation.shape.CircleShape
-//import androidx.compose.foundation.shape.RoundedCornerShape
-//import androidx.compose.material3.HorizontalDivider
-//import androidx.compose.material3.Icon
-//import androidx.compose.material3.MaterialTheme
-//import androidx.compose.material3.Text
-//import androidx.compose.runtime.Composable
-//import androidx.compose.runtime.derivedStateOf
-//import androidx.compose.runtime.getValue
-//import androidx.compose.runtime.mutableStateOf
-//import androidx.compose.runtime.remember
-//import androidx.compose.runtime.setValue
-//import androidx.compose.ui.Alignment
-//import androidx.compose.ui.Modifier
-//import androidx.compose.ui.draw.clip
-//import androidx.compose.ui.graphics.Color
-//import androidx.compose.ui.res.painterResource
-//import androidx.compose.ui.text.font.FontWeight
-//import androidx.compose.ui.text.style.TextOverflow
-//import androidx.compose.ui.unit.dp
-//import com.bluemix.cashio.R
-//import com.bluemix.cashio.core.format.CashioFormat
-//import com.bluemix.cashio.core.format.CashioFormat.toDayName
-//import com.bluemix.cashio.core.format.CashioFormat.toFullDate
-//import com.bluemix.cashio.core.format.CashioFormat.toTimeLabel
-//import com.bluemix.cashio.core.format.CashioFormat.toTransactionCountLabel
-//import com.bluemix.cashio.domain.model.Expense
-//import com.bluemix.cashio.domain.model.TransactionType
-//import com.bluemix.cashio.ui.components.defaults.CashioCard
-//import com.bluemix.cashio.ui.components.defaults.CashioRadius
-//import com.bluemix.cashio.ui.theme.CashioSemantic.ExpenseRed
-//import com.bluemix.cashio.ui.theme.CashioSemantic.IncomeGreen
-//import com.bluemix.cashio.ui.components.defaults.CashioSpacing
-//import java.time.LocalDate
-//import kotlin.math.abs
-//
-///**
-// * A collapsible card that groups all transactions for a specific date.
-// *
-// * Header displays:
-// * - Date and Day name.
-// * - Daily summary (Total Income, Total Expense).
-// *
-// * Expanded state displays:
-// * - A list of individual transaction rows.
-// *
-// * @param date The specific date for this group.
-// * @param transactions List of expenses/incomes occurring on this date.
-// * @param onTransactionClick Callback when a specific transaction row is clicked.
-// */
-//@Composable
-//fun DayTransactionCard(
-//    date: LocalDate,
-//    transactions: List<Expense>,
-//    onTransactionClick: (String) -> Unit,
-//    modifier: Modifier = Modifier,
-//    currencySymbol: String = "₹"
-//) {
-//    var isExpanded by remember { mutableStateOf(false) }
-//
-//    val dayName = remember(date) { date.toDayName() }
-//    val fullDate = remember(date) { date.toFullDate() }
-//
-//    // Efficiently calculate totals only when the transaction list changes
-//    val summary by remember(transactions) {
-//        derivedStateOf { transactions.toDaySummary() }
-//    }
-//
-//    val headerUi = remember(summary, currencySymbol) {
-//        summary.toHeaderUi(currencySymbol)
-//    }
-//
-//    CashioCard(
-//        modifier = modifier.fillMaxWidth(),
-//        onClick = null // Click handled by the header row specifically
-//    ) {
-//        Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.compact)) {
-//
-//            DayHeaderRow(
-//                dayName = dayName,
-//                fullDate = fullDate,
-//                transactionCount = transactions.size,
-//                headerUi = headerUi,
-//                isExpanded = isExpanded,
-//                onToggleExpand = { isExpanded = !isExpanded }
-//            )
-//
-//            AnimatedVisibility(
-//                visible = isExpanded,
-//                enter = fadeIn(),
-//                exit = fadeOut()
-//            ) {
-//                DayExpandedContent(
-//                    transactions = transactions,
-//                    currencySymbol = currencySymbol,
-//                    onTransactionClick = onTransactionClick
-//                )
-//            }
-//        }
-//    }
-//}
-//
-///**
-// * The always-visible top section of the card.
-// * Clicking this toggles the expansion state.
-// */
-//@Composable
-//private fun DayHeaderRow(
-//    dayName: String,
-//    fullDate: String,
-//    transactionCount: Int,
-//    headerUi: DayHeaderUi,
-//    isExpanded: Boolean,
-//    onToggleExpand: () -> Unit
-//) {
-//    Row(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .clip(RoundedCornerShape(CashioRadius.mediumSmall))
-//            .clickable(onClick = onToggleExpand)
-//            .padding(horizontal = CashioSpacing.xs, vertical = CashioSpacing.xxs),
-//        horizontalArrangement = Arrangement.SpaceBetween,
-//        verticalAlignment = Alignment.CenterVertically
-//    ) {
-//        // Left Side: Date Info
-//        Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)) {
-//            Text(
-//                text = dayName,
-//                style = MaterialTheme.typography.bodySmall,
-//                color = MaterialTheme.colorScheme.onSurfaceVariant
-//            )
-//            Text(
-//                text = fullDate,
-//                style = MaterialTheme.typography.titleMedium,
-//                fontWeight = FontWeight.SemiBold,
-//                color = MaterialTheme.colorScheme.onSurface
-//            )
-//            Text(
-//                text = transactionCount.toTransactionCountLabel(),
-//                style = MaterialTheme.typography.bodySmall,
-//                color = MaterialTheme.colorScheme.onSurfaceVariant
-//            )
-//        }
-//
-//        // Right Side: Financial Summary
-//        Row(
-//            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//            Column(
-//                horizontalAlignment = Alignment.End,
-//                verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)
-//            ) {
-//                headerUi.incomeText?.let {
-//                    Text(
-//                        text = it,
-//                        style = MaterialTheme.typography.titleMedium,
-//                        color = IncomeGreen,
-//                        fontWeight = FontWeight.Bold
-//                    )
-//                }
-//                headerUi.expenseText?.let {
-//                    Text(
-//                        text = it,
-//                        style = MaterialTheme.typography.titleMedium,
-//                        color = ExpenseRed,
-//                        fontWeight = FontWeight.Bold
-//                    )
-//                }
-//                headerUi.netText?.let {
-//                    Text(
-//                        text = it,
-//                        style = MaterialTheme.typography.bodySmall,
-//                        color = if (headerUi.isNetPositive) IncomeGreen else ExpenseRed,
-//                        fontWeight = FontWeight.Medium
-//                    )
-//                }
-//            }
-//
-//            Icon(
-//                painter = painterResource(if (isExpanded) R.drawable.chevronup else R.drawable.chevrondown),
-//                contentDescription = if (isExpanded) "Collapse" else "Expand",
-//                tint = MaterialTheme.colorScheme.outline,
-//                modifier = Modifier.size(24.dp)
-//            )
-//        }
-//    }
-//}
-//
-///**
-// * The content shown when the card is expanded.
-// * Includes a divider and a constrained list of transactions.
-// */
-//@Composable
-//private fun DayExpandedContent(
-//    transactions: List<Expense>,
-//    currencySymbol: String,
-//    onTransactionClick: (String) -> Unit
-//) {
-//    Column(
-//        modifier = Modifier.padding(top = CashioSpacing.small),
-//        verticalArrangement = Arrangement.spacedBy(CashioSpacing.small)
-//    ) {
-//        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-//
-//        Spacer(modifier = Modifier.height(CashioSpacing.xs))
-//
-//        // Constrain height to prevent massive cards on heavy transaction days
-//        LazyColumn(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .heightIn(max = 320.dp),
-//            verticalArrangement = Arrangement.spacedBy(CashioSpacing.small)
-//        ) {
-//            items(items = transactions, key = { it.id }) { tx ->
-//                DayTransactionRow(
-//                    transaction = tx,
-//                    currencySymbol = currencySymbol,
-//                    onClick = { onTransactionClick(tx.id) }
-//                )
-//            }
-//        }
-//    }
-//}
-//
-///**
-// * A dense row representing a single transaction inside the expanded view.
-// */
-//@Composable
-//fun DayTransactionRow(
-//    transaction: Expense,
-//    onClick: () -> Unit,
-//    modifier: Modifier = Modifier,
-//    currencySymbol: String = "₹"
-//) {
-//    val isExpense = transaction.transactionType == TransactionType.EXPENSE
-//    val amountColor = if (isExpense) ExpenseRed else IncomeGreen
-//    val sign = if (isExpense) "-" else "+"
-//
-//    val amountText = remember(transaction.amount, currencySymbol) {
-//        "$sign${CashioFormat.money(abs(transaction.amount), currencySymbol)}"
-//    }
-//
-//    val timeText = remember(transaction.date) {
-//        transaction.date.toTimeLabel()
-//    }
-//
-//    Row(
-//        modifier = modifier
-//            .fillMaxWidth()
-//            .clip(RoundedCornerShape(CashioRadius.small))
-//            .clickable(onClick = onClick)
-//            .padding(vertical = CashioSpacing.tiny),
-//        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
-//        verticalAlignment = Alignment.CenterVertically
-//    ) {
-//        CategoryIconBubble(
-//            icon = transaction.category.icon,
-//            tintBackground = transaction.category.color
-//        )
-//
-//        Column(
-//            modifier = Modifier.weight(1f),
-//            verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)
-//        ) {
-//            Text(
-//                text = transaction.title,
-//                style = MaterialTheme.typography.bodyMedium,
-//                color = MaterialTheme.colorScheme.onSurface,
-//                maxLines = 1,
-//                overflow = TextOverflow.Ellipsis
-//            )
-//            Text(
-//                text = timeText,
-//                style = MaterialTheme.typography.labelSmall,
-//                color = MaterialTheme.colorScheme.onSurfaceVariant
-//            )
-//        }
-//
-//        Text(
-//            text = amountText,
-//            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-//            color = amountColor
-//        )
-//    }
-//}
-//
-//@Composable
-//private fun CategoryIconBubble(icon: String, tintBackground: Color) {
-//    Box(
-//        modifier = Modifier
-//            .size(40.dp)
-//            .clip(CircleShape)
-//            .background(tintBackground.copy(alpha = 0.15f)),
-//        contentAlignment = Alignment.Center
-//    ) {
-//        Text(text = icon, style = MaterialTheme.typography.titleMedium)
-//    }
-//}
-//
-///* -------------------------------------------------------------------------- */
-///* Data Helpers                                                               */
-///* -------------------------------------------------------------------------- */
-//
-///**
-// * Aggregates a list of expenses into a summary of Income vs Expense.
-// */
-//private fun List<Expense>.toDaySummary(): DaySummary {
-//    val (inc, exp) = partition { it.transactionType == TransactionType.INCOME }
-//    val incomeSum = inc.sumOf { it.amount }
-//    val expenseSum = exp.sumOf { it.amount }
-//    return DaySummary(incomeSum, expenseSum, incomeSum - expenseSum)
-//}
-//
-///**
-// * Formats the raw summary data into displayable strings for the UI header.
-// * Only non-zero values are converted to text.
-// */
-//private fun DaySummary.toHeaderUi(currencySymbol: String): DayHeaderUi {
-//    val incText = income.takeIf { it > 0 }?.let { "+${CashioFormat.money(it, currencySymbol)}" }
-//    val expText = expense.takeIf { it > 0 }?.let { "-${CashioFormat.money(it, currencySymbol)}" }
-//
-//    // Only show "Net" if there is activity
-//    val netValueText = if (income > 0 || expense > 0) {
-//        val sign = if (net >= 0) "+" else "-"
-//        "Net: $sign${CashioFormat.money(abs(net), currencySymbol)}"
-//    } else null
-//
-//    return DayHeaderUi(incText, expText, netValueText, net >= 0)
-//}
-//
-//private data class DaySummary(val income: Double, val expense: Double, val net: Double)
-//
-//private data class DayHeaderUi(
-//    val incomeText: String?,
-//    val expenseText: String?,
-//    val netText: String?,
-//    val isNetPositive: Boolean
-//)
-
 package com.bluemix.cashio.ui.components.cards
 
 import androidx.compose.animation.AnimatedVisibility
@@ -365,99 +6,120 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.core.format.CashioFormat
-import com.bluemix.cashio.core.format.CashioFormat.toDayName
-import com.bluemix.cashio.core.format.CashioFormat.toFullDate
-import com.bluemix.cashio.core.format.CashioFormat.toTimeLabel
-import com.bluemix.cashio.core.format.CashioFormat.toTransactionCountLabel
+import com.bluemix.cashio.domain.model.Currency
 import com.bluemix.cashio.domain.model.Expense
 import com.bluemix.cashio.domain.model.TransactionType
-import com.bluemix.cashio.ui.components.defaults.CashioCard
-import com.bluemix.cashio.ui.components.defaults.CashioRadius
-import com.bluemix.cashio.ui.components.defaults.CashioSpacing
-import com.bluemix.cashio.ui.theme.CashioSemantic.ExpenseRed
-import com.bluemix.cashio.ui.theme.CashioSemantic.IncomeGreen
+import com.bluemix.cashio.ui.defaults.CashioCard
+import com.bluemix.cashio.ui.defaults.CashioRadius
+import com.bluemix.cashio.ui.defaults.CashioSpacing
+import com.bluemix.cashio.ui.theme.CashioSemantic
+import com.bluemix.cashio.ui.theme.toComposeColor
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlin.math.abs
+
+// Animation constants
+private object DayCardAnimations {
+    const val FadeInDuration = 140
+    const val ExpandDuration = 200
+    const val FadeOutDuration = 120
+    const val ShrinkDuration = 180
+}
 
 @Composable
 fun DayTransactionCard(
     date: LocalDate,
     transactions: List<Expense>,
-    onTransactionClick: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    currencySymbol: String = "₹"
+    currency: Currency = Currency.INR,
+    onTransactionClick: (String) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable(date.toString()) { mutableStateOf(false) }
 
-    val dayName = remember(date) { date.toDayName() }
-    val fullDate = remember(date) { date.toFullDate() }
+    // Optimized calculations - memoized by dependencies
+    val dateDisplay = remember(date) {
+        DateDisplay.from(date)
+    }
 
-    val summary = remember(transactions) { transactions.toDaySummary() }
-    val headerUi = remember(summary, currencySymbol) { summary.toHeaderUi(currencySymbol) }
+    val summary = remember(transactions, currency) {
+        DaySummaryState.from(transactions, currency)
+    }
+
+    // Accessibility
+    val semanticDesc = remember(dateDisplay, summary, transactions.size) {
+        "${dateDisplay.fullDate}, ${transactions.size} transactions, ${summary.semanticDescription}"
+    }
 
     CashioCard(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = semanticDesc },
         onClick = null
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.compact)) {
-
+        Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.sm)) {
             DayHeaderRow(
-                dayName = dayName,
-                fullDate = fullDate,
+                dateDisplay = dateDisplay,
                 transactionCount = transactions.size,
-                headerUi = headerUi,
+                summary = summary,
                 isExpanded = isExpanded,
                 onToggleExpand = { isExpanded = !isExpanded }
             )
 
             AnimatedVisibility(
                 visible = isExpanded,
-                enter = fadeIn(animationSpec = tween(140)) +
-                        expandVertically(animationSpec = tween(200)),
-                exit = fadeOut(animationSpec = tween(120)) +
-                        shrinkVertically(animationSpec = tween(180))
+                enter = fadeIn(animationSpec = tween(DayCardAnimations.FadeInDuration)) +
+                        expandVertically(animationSpec = tween(DayCardAnimations.ExpandDuration)),
+                exit = fadeOut(animationSpec = tween(DayCardAnimations.FadeOutDuration)) +
+                        shrinkVertically(animationSpec = tween(DayCardAnimations.ShrinkDuration))
             ) {
-                DayExpandedContent(
-                    transactions = transactions,
-                    currencySymbol = currencySymbol,
-                    onTransactionClick = onTransactionClick
-                )
+                Column {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = CashioSpacing.xs),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
+                    Spacer(modifier = Modifier.height(CashioSpacing.xs))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(CashioSpacing.xs)
+                    ) {
+                        transactions.forEach { tx ->
+                            key(tx.id) { // Optimize recompositions
+                                TransactionListItem(
+                                    title = tx.title,
+                                    amountPaise = tx.amountPaise,
+                                    type = tx.transactionType,
+                                    dateTime = tx.date,
+                                    categoryIcon = tx.category.icon,
+                                    categoryColor = tx.category.colorHex.toComposeColor(),
+                                    currency = currency,
+                                    compact = true,
+                                    onClick = { onTransactionClick(tx.id) }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(CashioSpacing.xs))
+                }
             }
         }
     }
@@ -465,17 +127,20 @@ fun DayTransactionCard(
 
 @Composable
 private fun DayHeaderRow(
-    dayName: String,
-    fullDate: String,
+    dateDisplay: DateDisplay,
     transactionCount: Int,
-    headerUi: DayHeaderUi,
+    summary: DaySummaryState,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit
 ) {
+    val countLabel = remember(transactionCount) {
+        if (transactionCount == 1) "1 transaction" else "$transactionCount transactions"
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(CashioRadius.mediumSmall))
+            .clip(RoundedCornerShape(CashioRadius.small))
             .clickable(onClick = onToggleExpand)
             .padding(horizontal = CashioSpacing.xs, vertical = CashioSpacing.xxs),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -483,202 +148,138 @@ private fun DayHeaderRow(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)) {
             Text(
-                text = dayName,
+                text = dateDisplay.dayName,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
             )
             Text(
-                text = fullDate,
+                text = dateDisplay.fullDate,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = transactionCount.toTransactionCountLabel(),
+                text = countLabel,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)
             ) {
-                headerUi.incomeText?.let {
+                summary.incomeText?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = IncomeGreen,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = CashioSemantic.IncomeGreen,
                         fontWeight = FontWeight.Bold
                     )
                 }
-                headerUi.expenseText?.let {
+                summary.expenseText?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = ExpenseRed,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = CashioSemantic.ExpenseRed,
                         fontWeight = FontWeight.Bold
                     )
                 }
-                headerUi.netText?.let {
+                summary.netText?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (headerUi.isNetPositive) IncomeGreen else ExpenseRed,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (summary.isNetPositive)
+                            CashioSemantic.IncomeGreen
+                        else
+                            CashioSemantic.ExpenseRed,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
 
             Icon(
-                painter = painterResource(id = if (isExpanded) R.drawable.chevronup else R.drawable.chevrondown),
+                painter = painterResource(
+                    id = if (isExpanded) R.drawable.chevronup else R.drawable.chevrondown
+                ),
                 contentDescription = if (isExpanded) "Collapse" else "Expand",
                 tint = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }
 }
 
-@Composable
-private fun DayExpandedContent(
-    transactions: List<Expense>,
-    currencySymbol: String,
-    onTransactionClick: (String) -> Unit
+/* --- Immutable State Holders --- */
+
+@androidx.compose.runtime.Immutable
+private data class DateDisplay(
+    val dayName: String,
+    val fullDate: String
 ) {
-    Column(
-        modifier = Modifier.padding(top = CashioSpacing.small),
-        verticalArrangement = Arrangement.spacedBy(CashioSpacing.small)
-    ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        Spacer(modifier = Modifier.height(CashioSpacing.xs))
-
-        // NOTE:
-        // If nested scrolling feels "sticky", replace this LazyColumn with a simple Column.
-        // Because height is capped, Column is usually smoother.
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 320.dp),
-            verticalArrangement = Arrangement.spacedBy(CashioSpacing.small)
-        ) {
-            items(items = transactions, key = { it.id }) { tx ->
-                DayTransactionRow(
-                    transaction = tx,
-                    currencySymbol = currencySymbol,
-                    onClick = { onTransactionClick(tx.id) }
-                )
-            }
+    companion object {
+        fun from(date: LocalDate): DateDisplay {
+            val dayName = date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            val fullDate = date.format(
+                DateTimeFormatter.ofPattern("dd MMMM, yyyy", Locale.getDefault())
+            )
+            return DateDisplay(dayName, fullDate)
         }
     }
 }
 
-@Composable
-fun DayTransactionRow(
-    transaction: Expense,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    currencySymbol: String = "₹"
-) {
-    val isExpense = transaction.transactionType == TransactionType.EXPENSE
-    val amountColor = if (isExpense) ExpenseRed else IncomeGreen
-    val sign = if (isExpense) "-" else "+"
-
-    val amountText = remember(transaction.amount, currencySymbol, isExpense) {
-        "$sign${CashioFormat.money(abs(transaction.amount), currencySymbol)}"
-    }
-
-    val timeText = remember(transaction.date) { transaction.date.toTimeLabel() }
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(CashioRadius.small))
-            .clickable(onClick = onClick)
-            .padding(vertical = CashioSpacing.tiny),
-        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        CategoryIconBubble(
-            icon = transaction.category.icon,
-            tintBackground = transaction.category.color
-        )
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)
-        ) {
-            Text(
-                text = transaction.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = timeText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Text(
-            text = amountText,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = amountColor
-        )
-    }
-}
-
-@Composable
-private fun CategoryIconBubble(icon: String, tintBackground: Color) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(tintBackground.copy(alpha = 0.15f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = icon, style = MaterialTheme.typography.titleMedium)
-    }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Data Helpers                                                               */
-/* -------------------------------------------------------------------------- */
-
-private fun List<Expense>.toDaySummary(): DaySummary {
-    // ✅ single pass
-    var income = 0.0
-    var expense = 0.0
-    for (e in this) {
-        if (e.transactionType == TransactionType.INCOME) income += e.amount
-        else expense += e.amount
-    }
-    return DaySummary(income, expense, income - expense)
-}
-
-private fun DaySummary.toHeaderUi(currencySymbol: String): DayHeaderUi {
-    val incText = income.takeIf { it > 0 }?.let { "+${CashioFormat.money(it, currencySymbol)}" }
-    val expText = expense.takeIf { it > 0 }?.let { "-${CashioFormat.money(it, currencySymbol)}" }
-
-    val netValueText = if (income > 0 || expense > 0) {
-        val sign = if (net >= 0) "+" else "-"
-        "Net: $sign${CashioFormat.money(abs(net), currencySymbol)}"
-    } else null
-
-    return DayHeaderUi(incText, expText, netValueText, net >= 0)
-}
-
-private data class DaySummary(val income: Double, val expense: Double, val net: Double)
-
-private data class DayHeaderUi(
+@androidx.compose.runtime.Immutable
+private data class DaySummaryState(
     val incomeText: String?,
     val expenseText: String?,
     val netText: String?,
-    val isNetPositive: Boolean
-)
+    val isNetPositive: Boolean,
+    val semanticDescription: String
+) {
+    companion object {
+        fun from(transactions: List<Expense>, currency: Currency): DaySummaryState {
+            var income = 0L
+            var expense = 0L
+
+            for (tx in transactions) {
+                when (tx.transactionType) {
+                    TransactionType.INCOME -> income += tx.amountPaise
+                    TransactionType.EXPENSE -> expense += tx.amountPaise
+                }
+            }
+
+            val net = income - expense
+            val isPositive = net >= 0L
+
+            val incText = income.takeIf { it > 0L }?.let {
+                "+ ${CashioFormat.money(it, currency)}"
+            }
+            val expText = expense.takeIf { it > 0L }?.let {
+                "- ${CashioFormat.money(it, currency)}"
+            }
+            val netText = if (income > 0L || expense > 0L) {
+                val sign = if (net >= 0L) "+" else "-"
+                "Net: $sign${CashioFormat.money(abs(net), currency)}"
+            } else null
+
+            val semantic = buildString {
+                incText?.let { append("Income $it, ") }
+                expText?.let { append("Expense $it, ") }
+                netText?.let { append(it) }
+            }
+
+            return DaySummaryState(
+                incomeText = incText,
+                expenseText = expText,
+                netText = netText,
+                isNetPositive = isPositive,
+                semanticDescription = semantic
+            )
+        }
+    }
+}

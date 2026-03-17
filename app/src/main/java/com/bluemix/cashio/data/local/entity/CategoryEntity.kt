@@ -1,14 +1,14 @@
 package com.bluemix.cashio.data.local.entity
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import io.realm.kotlin.types.RealmObject
-import io.realm.kotlin.types.annotations.Ignore
 import io.realm.kotlin.types.annotations.PrimaryKey
 
 /**
- * Realm entity for Category
- * Optimized: color stored as Int (ARGB), not String
+ * Realm persistence entity for [com.bluemix.cashio.domain.model.Category].
+ *
+ * Color is stored as an ARGB [Int] — conversion to/from [Long] or
+ * [androidx.compose.ui.graphics.Color] happens exclusively in the mapper layer.
+ * This class has zero UI/Compose dependencies.
  */
 class CategoryEntity : RealmObject {
     @PrimaryKey
@@ -17,14 +17,15 @@ class CategoryEntity : RealmObject {
     var name: String = ""
     var icon: String = ""
 
+    /** ARGB color packed as Int. Use [com.bluemix.cashio.data.local.mapper.toDomain] to convert. */
     var colorArgb: Int = 0
 
     var isDefault: Boolean = false
 
-    @Ignore
-    var color: Color
-        get() = Color(colorArgb)
-        set(value) {
-            colorArgb = value.toArgb()
-        }
+    /**
+     * Explicit display sort order preserving the semantic grouping from
+     * [com.bluemix.cashio.domain.model.Category.DEFAULT_CATEGORIES].
+     * Alphabetical sorting destroys the Food / Transport / Housing grouping.
+     */
+    var sortOrder: Int = 0
 }

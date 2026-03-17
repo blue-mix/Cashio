@@ -1,67 +1,100 @@
 package com.bluemix.cashio.core.common
 
+import kotlinx.coroutines.CancellationException
+
 /**
- * Result wrapper for repository operations
- * Provides type-safe error handling
+ * A discriminated union representing the outcome of an operation.
+ *
+ * ## No Loading state
+ * [Loading] has been intentionally removed. Loading is UI state — it belongs as a
+ * `Boolean` field inside the screen's `UiState` data class, not as a [Result] variant
+ * that every `when` expression must handle. Mixing UI state and result state in one
+ * type forces every non-UI layer (use cases, repositories) to be aware of it.
+ *
+ * ## Usage
+ * ```kotlin
+ * when (val result = getExpensesUseCase()) {
+ *     is Result.Success -> render(result.data)
+ *     is Result.Error   -> showError(result.message)
+ * }
+ * ```
  */
 sealed class Result<out T> {
-    data class Success<T>(val data: T) : Result<T>()
-    data class Error(val exception: Throwable, val message: String? = null) : Result<Nothing>()
-    data object Loading : Result<Nothing>()
 
-    val isSuccess: Boolean get() = this is Success
-    val isError: Boolean get() = this is Error
-    val isLoading: Boolean get() = this is Loading
+    data class Success<out T>(val data: T) : Result<T>()
 
-    fun getOrNull(): T? = when (this) {
-        is Success -> data
-        else -> null
-    }
+    data class Error(
+        val exception: Exception,
+        val message: String? = exception.message
+    ) : Result<Nothing>()
 
-    fun getOrThrow(): T = when (this) {
-        is Success -> data
-        is Error -> throw exception
-        is Loading -> throw IllegalStateException("Result is still loading")
-    }
+    val isSuccess get() = this is Success
+    val isError get() = this is Error
 
-    fun getOrDefault(default: @UnsafeVariance T): T = when (this) {
-        is Success -> data
-        else -> default
-    }
+    /** Returns data if [Success], or null otherwise. */
+    fun getOrNull(): T? = (this as? Success)?.data
 
+    /**
+     * Transforms a [Success] value using [transform].
+     *
+     * Any exception thrown by [transform] is caught and returned as [Error],
+     * so callers never receive an uncaught exception from a map operation.
+     *
+     * [CancellationException] is always re-thrown — never swallowed — to
+     * preserve structured concurrency semantics.
+     */
     fun <R> map(transform: (T) -> R): Result<R> = when (this) {
-        is Success -> Success(transform(data))
-        is Error -> Error(exception, message)
-        is Loading -> Loading
+        is Success -> try {
+            Success(transform(data))
+        } catch (e: CancellationException) {
+            throw e     // Must propagate — never catch CancellationException
+        } catch (e: Exception) {
+            Error(e, e.message)
+        }
+
+        is Error -> this
     }
 
+    /**
+     * Chains a suspending operation that itself returns [Result].
+     * Short-circuits on [Error].
+     */
     suspend fun <R> flatMap(transform: suspend (T) -> Result<R>): Result<R> = when (this) {
-        is Success -> transform(data)
-        is Error -> Error(exception, message)
-        is Loading -> Loading
+        is Success -> try {
+            transform(data)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Error(e, e.message)
+        }
+
+        is Error -> this
+    }
+
+    /** Executes [action] if this is [Success], then returns this unchanged. */
+    fun onSuccess(action: (T) -> Unit): Result<T> {
+        if (this is Success) action(data)
+        return this
+    }
+
+    /** Executes [action] if this is [Error], then returns this unchanged. */
+    fun onError(action: (Error) -> Unit): Result<T> {
+        if (this is Error) action(this)
+        return this
     }
 }
 
 /**
- * Extension to execute a suspending block and wrap in Result
+ * Wraps a suspending [block] in a [Result].
+ *
+ * [CancellationException] is **always re-thrown** so coroutine cancellation
+ * propagates correctly through structured concurrency. Swallowing it would
+ * cause coroutines to hang indefinitely after cancellation.
  */
-suspend fun <T> resultOf(block: suspend () -> T): Result<T> {
-    return try {
-        Result.Success(block())
-    } catch (e: Exception) {
-        Result.Error(e, e.message)
-    }
-}
-
-/**
- * Extension to handle Result with callback
- */
-inline fun <T> Result<T>.onSuccess(action: (T) -> Unit): Result<T> {
-    if (this is Result.Success) action(data)
-    return this
-}
-
-inline fun <T> Result<T>.onError(action: (Throwable) -> Unit): Result<T> {
-    if (this is Result.Error) action(exception)
-    return this
+suspend fun <T> resultOf(block: suspend () -> T): Result<T> = try {
+    Result.Success(block())
+} catch (e: CancellationException) {
+    throw e     // Never swallow — propagate cancellation
+} catch (e: Exception) {
+    Result.Error(e, e.message)
 }

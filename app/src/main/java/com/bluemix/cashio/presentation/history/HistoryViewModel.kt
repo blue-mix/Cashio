@@ -5,44 +5,18 @@ import androidx.lifecycle.viewModelScope
 import com.bluemix.cashio.domain.model.Expense
 import com.bluemix.cashio.domain.model.TransactionType
 import com.bluemix.cashio.domain.usecase.expense.ObserveExpensesUseCase
+import com.bluemix.cashio.domain.usecase.preferences.ObserveSelectedCurrencyUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.roundToInt
-
-/**
- * State holder for the History screen.
- *
- * @property transactionsByDate Source of truth map grouping all loaded transactions by date.
- * @property sortedDayGroups A pre-sorted list of all transaction groups (newest first).
- * @property visibleDayGroups The derived list actually shown in the UI. If a date is selected, contains only that day.
- * @property expenseTotalByDate Map of Date -> Total Spending (used for dots/heatmap).
- * @property expenseHeatLevelByDate Map of Date -> Intensity Level (0-4) for calendar coloring.
- * @property selectedDate The currently active filter from the calendar.
- */
-data class HistoryState(
-    // Data Source
-    val transactionsByDate: Map<LocalDate, List<Expense>> = emptyMap(),
-    val sortedDayGroups: List<Pair<LocalDate, List<Expense>>> = emptyList(),
-
-    // UI Render Target (Filtered)
-    val visibleDayGroups: List<Pair<LocalDate, List<Expense>>> = emptyList(),
-
-    // Visualization Data
-    val expenseTotalByDate: Map<LocalDate, Double> = emptyMap(),
-    val expenseHeatLevelByDate: Map<LocalDate, Int> = emptyMap(),
-
-    // UI Status
-    val selectedDate: LocalDate? = null,
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null
-)
 
 /**
  * ViewModel responsible for the Transaction History and Calendar Heatmap.
@@ -52,21 +26,29 @@ data class HistoryState(
  * 2. Processes raw data into daily groups for the list.
  * 3. Calculates "Spending Heat" dynamically based on the user's spending percentiles.
  * 4. Manages filtering when a user taps a specific day on the calendar.
+ *
+ * **All monetary values use paise (Long) internally.**
  */
 class HistoryViewModel(
-    private val observeExpensesUseCase: ObserveExpensesUseCase
+    private val observeExpensesUseCase: ObserveExpensesUseCase,
+    private val observeSelectedCurrencyUseCase: ObserveSelectedCurrencyUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HistoryState(isLoading = true))
     val state: StateFlow<HistoryState> = _state.asStateFlow()
 
     init {
-        observeTransactions()
+        observeData()
     }
 
-    private fun observeTransactions() {
+    private fun observeData() {
         viewModelScope.launch {
-            observeExpensesUseCase()
+            combine(
+                observeExpensesUseCase(),
+                observeSelectedCurrencyUseCase()
+            ) { transactions, currency ->
+                transactions to currency
+            }
                 .distinctUntilChanged()
                 .catch { t ->
                     updateState {
@@ -76,7 +58,7 @@ class HistoryViewModel(
                         )
                     }
                 }
-                .collectLatest { transactions ->
+                .collectLatest { (transactions, currency) ->
                     // Heavy calculation offloaded to background via coroutine context
                     val processed = processData(transactions)
 
@@ -84,8 +66,9 @@ class HistoryViewModel(
                         val newState = old.copy(
                             transactionsByDate = processed.byDate,
                             sortedDayGroups = processed.sortedGroups,
-                            expenseTotalByDate = processed.totals,
+                            expenseTotalByDatePaise = processed.totalsPaise,
                             expenseHeatLevelByDate = processed.heatLevels,
+                            selectedCurrency = currency,
                             isLoading = false,
                             errorMessage = null
                         )
@@ -119,12 +102,13 @@ class HistoryViewModel(
     private data class ProcessedData(
         val byDate: Map<LocalDate, List<Expense>>,
         val sortedGroups: List<Pair<LocalDate, List<Expense>>>,
-        val totals: Map<LocalDate, Double>,
+        val totalsPaise: Map<LocalDate, Long>,
         val heatLevels: Map<LocalDate, Int>
     )
 
     /**
      * Transforms raw flat transactions into grouped, sorted, and analyzed data structures.
+     * All monetary values in **paise (Long)**.
      */
     private fun processData(transactions: List<Expense>): ProcessedData {
         // 1. Group by Date & Sort Descending
@@ -134,23 +118,25 @@ class HistoryViewModel(
 
         val sortedGroups = byDate.toList().sortedByDescending { (date, _) -> date }
 
-        // 2. Calculate Daily Totals (Expenses only for heatmap)
-        val totals = byDate.mapValues { (_, items) ->
-            items.filter { it.transactionType == TransactionType.EXPENSE }.sumOf { it.amount }
+        // 2. Calculate Daily Totals (Expenses only for heatmap) in paise
+        val totalsPaise = byDate.mapValues { (_, items) ->
+            items
+                .filter { it.transactionType == TransactionType.EXPENSE }
+                .sumOf { it.amountPaise }
         }
 
         // 3. Compute Dynamic Heatmap Thresholds
         // We calculate percentiles (median, 75th, 90th) of *this specific user's* spending habits.
         // This ensures the colors are meaningful regardless of whether they spend $10 or $1000 daily.
-        val positiveSpends = totals.values.filter { it > 0.0 }.sorted()
+        val positiveSpends = totalsPaise.values.filter { it > 0L }.sorted()
         val thresholds = computeThresholds(positiveSpends)
 
         // 4. Map Totals to Heat Levels (0-4)
-        val heatLevels = totals.mapValues { (_, amount) ->
-            getHeatLevel(amount, thresholds)
+        val heatLevels = totalsPaise.mapValues { (_, amountPaise) ->
+            getHeatLevel(amountPaise, thresholds)
         }
 
-        return ProcessedData(byDate, sortedGroups, totals, heatLevels)
+        return ProcessedData(byDate, sortedGroups, totalsPaise, heatLevels)
     }
 
     /**
@@ -168,15 +154,15 @@ class HistoryViewModel(
     /* Heatmap Math Helpers                                                       */
     /* -------------------------------------------------------------------------- */
 
-    private data class Thresholds(val p50: Double, val p75: Double, val p90: Double)
+    private data class Thresholds(val p50: Long, val p75: Long, val p90: Long)
 
-    private fun computeThresholds(sortedValues: List<Double>): Thresholds {
+    private fun computeThresholds(sortedValues: List<Long>): Thresholds {
         if (sortedValues.size < 4) {
-            val max = sortedValues.maxOrNull() ?: 0.0
+            val max = sortedValues.maxOrNull() ?: 0L
             return Thresholds(max, max, max)
         }
 
-        fun getPercentile(p: Double): Double {
+        fun getPercentile(p: Double): Long {
             val index = ((sortedValues.size - 1) * p).roundToInt()
             return sortedValues[index.coerceIn(sortedValues.indices)]
         }
@@ -188,13 +174,13 @@ class HistoryViewModel(
         )
     }
 
-    private fun getHeatLevel(amount: Double, t: Thresholds): Int {
-        if (amount <= 0.0) return 0
+    private fun getHeatLevel(amountPaise: Long, t: Thresholds): Int {
+        if (amountPaise <= 0L) return 0
         return when {
-            amount <= t.p50 -> 1 // Low intensity
-            amount <= t.p75 -> 2 // Medium intensity
-            amount <= t.p90 -> 3 // High intensity
-            else -> 4            // Max intensity
+            amountPaise <= t.p50 -> 1 // Low intensity
+            amountPaise <= t.p75 -> 2 // Medium intensity
+            amountPaise <= t.p90 -> 3 // High intensity
+            else -> 4                 // Max intensity
         }
     }
 

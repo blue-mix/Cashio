@@ -1,16 +1,9 @@
 package com.bluemix.cashio.ui.components.cards
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -18,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -25,78 +20,66 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.core.format.CashioFormat
-import com.bluemix.cashio.core.format.CashioFormat.toDateLabel
-import com.bluemix.cashio.core.format.CashioFormat.toTimeLabel
+import com.bluemix.cashio.domain.model.Currency
 import com.bluemix.cashio.domain.model.TransactionType
-import com.bluemix.cashio.ui.components.defaults.CashioCard
-import com.bluemix.cashio.ui.components.defaults.CashioSpacing
+import com.bluemix.cashio.ui.defaults.CashioCard
+import com.bluemix.cashio.ui.defaults.CashioCardDefaults
+import com.bluemix.cashio.ui.defaults.CashioSpacing
 import com.bluemix.cashio.ui.theme.CashioSemantic
 import java.time.LocalDateTime
-import kotlin.math.absoluteValue
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-/**
- * A standard list item representing a single financial transaction.
- *
- * This component automatically handles:
- * - Formatting the amount with the currency symbol.
- * - Applying Semantic colors (Red for Expense, Green for Income).
- * - Formatting the date and time strings.
- * - Adjusting layout density via the [compact] parameter.
- *
- * @param title The primary text (Merchant name or Description).
- * @param amount The raw transaction amount.
- * @param type Determines if this is [TransactionType.INCOME] or [TransactionType.EXPENSE].
- * @param dateTime The timestamp of the transaction.
- * @param categoryIcon The emoji or character representing the category.
- * @param categoryColor The background tint color for the category icon.
- * @param showCategoryIcon Whether to display the leading circular icon.
- * @param showChevron Whether to display the trailing arrow icon indicating navigation.
- * @param showDate Whether to display the secondary text line with date/time.
- * @param compact If true, reduces padding and font sizes for dense lists (e.g., Dashboard).
- * @param currencySymbol The symbol to prefix the amount with (default "₹").
- * @param onClick Callback when the item is tapped.
- */
+private object TransactionItemDefaults {
+    val IconSizeCompact = 40.dp
+    val IconSizeDefault = 48.dp
+    val EmojiSizeCompact = 18.sp
+    val EmojiSizeDefault = 22.sp
+    val PaddingCompact = 8.dp
+    val PaddingDefault = 12.dp
+}
+
 @Composable
 fun TransactionListItem(
     title: String,
-    amount: Double,
+    amountPaise: Long,
     type: TransactionType,
     dateTime: LocalDateTime,
     categoryIcon: String = "📦",
     categoryColor: Color = Color(0xFFE0E0E0),
+    currency: Currency = Currency.INR,
     showCategoryIcon: Boolean = true,
     showChevron: Boolean = true,
     showDate: Boolean = true,
     compact: Boolean = false,
-    currencySymbol: String = "₹",
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val iconSize = if (compact) 40.dp else 48.dp
-    val emojiFontSize = if (compact) 20.sp else 24.sp
-
-    val amountColor = when (type) {
-        TransactionType.EXPENSE -> CashioSemantic.ExpenseRed
-        TransactionType.INCOME -> CashioSemantic.IncomeGreen
+    // Derived display state
+    val displayState = remember(amountPaise, type, dateTime, currency, compact) {
+        TransactionDisplayState.from(
+            amountPaise = amountPaise,
+            type = type,
+            dateTime = dateTime,
+            currency = currency,
+            compact = compact
+        )
     }
 
-    val formattedAmount = remember(amount, currencySymbol) {
-        CashioFormat.money(amount.absoluteValue, currencySymbol)
-    }
-
-    val signedAmountText = remember(type, formattedAmount) {
-        if (type == TransactionType.EXPENSE) "-$formattedAmount" else "+$formattedAmount"
-    }
-
-    val dateText = remember(dateTime) {
-        val datePart = dateTime.toDateLabel()
-        val timePart = dateTime.toTimeLabel()
-        "$datePart • $timePart"
+    // Accessibility
+    val semanticDescription = remember(title, displayState.signedAmountText, displayState.dateText) {
+        "$title, ${displayState.signedAmountText}, ${displayState.dateText}"
     }
 
     CashioCard(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = semanticDescription },
         onClick = onClick,
+        padding = PaddingValues(
+            if (compact) TransactionItemDefaults.PaddingCompact
+            else TransactionItemDefaults.PaddingDefault
+        ),
         containerColor = if (compact)
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
         else
@@ -104,15 +87,17 @@ fun TransactionListItem(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (showCategoryIcon) {
                 CategoryIconChip(
                     icon = categoryIcon,
                     color = categoryColor,
-                    size = iconSize,
-                    fontSize = emojiFontSize
+                    size = if (compact) TransactionItemDefaults.IconSizeCompact
+                    else TransactionItemDefaults.IconSizeDefault,
+                    fontSize = if (compact) TransactionItemDefaults.EmojiSizeCompact
+                    else TransactionItemDefaults.EmojiSizeDefault
                 )
             }
 
@@ -122,17 +107,22 @@ fun TransactionListItem(
             ) {
                 Text(
                     text = title,
-                    style = if (compact) MaterialTheme.typography.titleSmall
-                    else MaterialTheme.typography.titleMedium,
+                    style = if (compact)
+                        MaterialTheme.typography.titleSmall
+                    else
+                        MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
 
                 if (showDate) {
                     Text(
-                        text = dateText,
-                        style = if (compact) MaterialTheme.typography.labelSmall
-                        else MaterialTheme.typography.bodySmall,
+                        text = displayState.dateText,
+                        style = if (compact)
+                            MaterialTheme.typography.labelSmall
+                        else
+                            MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
@@ -140,30 +130,65 @@ fun TransactionListItem(
             }
 
             Text(
-                text = signedAmountText,
-                style = if (compact) {
-                    MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
-                } else {
-                    MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                },
-                color = amountColor
+                text = displayState.signedAmountText,
+                style = if (compact)
+                    MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                else
+                    MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = displayState.amountColor
             )
 
-            if (showChevron) {
+            if (showChevron && !compact) {
                 Icon(
-                    painter = painterResource(R.drawable.chevron),
+                    painter = painterResource(id = R.drawable.chevron),
                     contentDescription = "View details",
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(20.dp)
+                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
     }
 }
 
-/**
- * A private helper composable to render the circular category icon.
- */
+@androidx.compose.runtime.Immutable
+private data class TransactionDisplayState(
+    val signedAmountText: String,
+    val dateText: String,
+    val amountColor: Color
+) {
+    companion object {
+        fun from(
+            amountPaise: Long,
+            type: TransactionType,
+            dateTime: LocalDateTime,
+            currency: Currency,
+            compact: Boolean
+        ): TransactionDisplayState {
+            val formattedAmount = CashioFormat.money(amountPaise, currency)
+            val signedAmount = if (type == TransactionType.EXPENSE)
+                "-$formattedAmount"
+            else
+                "+$formattedAmount"
+
+            val pattern = if (compact) "dd MMM" else "dd MMM • hh:mm a"
+            val dateStr = dateTime.format(
+                DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
+            )
+
+            val color = when (type) {
+                TransactionType.EXPENSE -> CashioSemantic.ExpenseRed
+                TransactionType.INCOME -> CashioSemantic.IncomeGreen
+            }
+
+            return TransactionDisplayState(
+                signedAmountText = signedAmount,
+                dateText = dateStr,
+                amountColor = color
+            )
+        }
+    }
+}
+
 @Composable
 private fun CategoryIconChip(
     icon: String,
@@ -180,7 +205,7 @@ private fun CategoryIconChip(
     ) {
         Text(
             text = icon,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = fontSize)
+            fontSize = fontSize
         )
     }
 }

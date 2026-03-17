@@ -3,16 +3,17 @@ package com.bluemix.cashio.presentation.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bluemix.cashio.core.common.Result
-import com.bluemix.cashio.domain.model.DateRange
+import com.bluemix.cashio.domain.model.Currency
 import com.bluemix.cashio.domain.model.Expense
 import com.bluemix.cashio.domain.model.TransactionType
 import com.bluemix.cashio.domain.usecase.expense.ObserveExpensesByDateRangeUseCase
-import com.bluemix.cashio.domain.usecase.expense.ObserveExpensesUseCase
 import com.bluemix.cashio.domain.usecase.expense.RefreshExpensesFromSmsUseCase
+import com.bluemix.cashio.domain.usecase.preferences.ObserveSelectedCurrencyUseCase
 import com.bluemix.cashio.presentation.common.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -20,31 +21,33 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
-import java.time.LocalTime
+import java.time.temporal.TemporalAdjusters
 import kotlin.math.absoluteValue
 
 /**
  * UI State for the Dashboard screen.
  *
- * @property totalExpenses The total amount spent in the current month.
- * @property walletBalance The current available balance (aggregated or manually set).
- * @property percentageChange The percentage difference in spending compared to the previous month.
- * @property isIncrease True if spending has increased compared to last month (visualized as Red/Bad).
- * @property recentExpenses The list of 5 most recent transactions for the selected range.
- * @property selectedDateRange The time filter for the recent transactions list.
- * @property isRefreshingSms True when the background SMS parsing job is active.
- * @property smsRefreshMessage One-time event message showing the result of the SMS sync.
+ * All monetary values are in **paise (Long)** — the smallest currency unit.
+ *
+ * @property totalExpensesPaise Total amount spent in the current month (paise).
+ * @property percentageChange Percentage difference vs last month (0-100+).
+ * @property isIncrease True if spending increased compared to last month.
+ * @property recentExpenses List of recent transactions.
+ * @property selectedCurrency The user's selected currency for formatting.
+ * @property isRefreshingSms True when SMS sync is active.
+ * @property smsRefreshMessage One-time feedback message from SMS sync.
  */
 data class DashboardState(
-    // Summary Metrics
-    val totalExpenses: Double = 0.0,
-    val walletBalance: Double = 0.0,
+    // Summary Metrics (in paise)
+    val totalExpensesPaise: Long = 0L,
     val percentageChange: Float = 0f,
     val isIncrease: Boolean = false,
 
     // Recent Activity
     val recentExpenses: UiState<List<Expense>> = UiState.Idle,
-    val selectedDateRange: DateRange = DateRange.THIS_MONTH,
+
+    // Currency
+    val selectedCurrency: Currency = Currency.INR,
 
     // Sync Status
     val isRefreshingSms: Boolean = false,
@@ -55,104 +58,110 @@ data class DashboardState(
  * ViewModel for the main Dashboard.
  *
  * Responsibilities:
- * 1. Aggregates monthly statistics (Current vs Previous month) for the Hero card.
- * 2. Fetches a limited list of recent transactions.
- * 3. Triggers the [RefreshExpensesFromSmsUseCase] to sync new data from the device.
+ * 1. Aggregates monthly statistics (Current vs Previous month).
+ * 2. Fetches recent transactions for the current month.
+ * 3. Triggers SMS sync via [RefreshExpensesFromSmsUseCase].
+ *
+ * **All monetary values use paise (Long) internally.**
  */
 class DashboardViewModel(
-    private val observeExpensesUseCase: ObserveExpensesUseCase,
     private val observeExpensesByDateRangeUseCase: ObserveExpensesByDateRangeUseCase,
+    private val observeSelectedCurrencyUseCase: ObserveSelectedCurrencyUseCase,
     private val refreshExpensesFromSmsUseCase: RefreshExpensesFromSmsUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardState())
     val state: StateFlow<DashboardState> = _state.asStateFlow()
 
-    // Internal trigger to force re-fetching recent transactions (e.g. after error)
+    // Internal trigger to force re-fetching (e.g., after error)
     private val retryTrigger = MutableStateFlow(0)
 
     init {
-        observeRecentTransactions()
-        observeMonthlyStats()
+        observeDashboardData()
     }
 
     /* -------------------------------------------------------------------------- */
-    /* Recent Transactions Logic                                                  */
+    /* Core Data Observation                                                      */
     /* -------------------------------------------------------------------------- */
 
-    private fun observeRecentTransactions() {
+    private fun observeDashboardData() {
         viewModelScope.launch {
-            // Re-fetch whenever the date range changes OR a retry is triggered
+            updateState { it.copy(recentExpenses = UiState.Loading) }
+
+            val now = LocalDateTime.now()
+
+            // Define month bounds
+            val thisMonthStart =
+                now.with(TemporalAdjusters.firstDayOfMonth()).toLocalDate().atStartOfDay()
+            val thisMonthEnd =
+                now.with(TemporalAdjusters.lastDayOfMonth()).toLocalDate().atTime(23, 59, 59)
+
+            val lastMonthStart = now.minusMonths(1)
+                .with(TemporalAdjusters.firstDayOfMonth()).toLocalDate().atStartOfDay()
+            val lastMonthEnd = now.minusMonths(1)
+                .with(TemporalAdjusters.lastDayOfMonth()).toLocalDate().atTime(23, 59, 59)
+
+            // Observe this month's expenses
+            val thisMonthFlow = observeExpensesByDateRangeUseCase(
+                ObserveExpensesByDateRangeUseCase.Params(thisMonthStart, thisMonthEnd)
+            )
+
+            // Observe last month's expenses
+            val lastMonthFlow = observeExpensesByDateRangeUseCase(
+                ObserveExpensesByDateRangeUseCase.Params(lastMonthStart, lastMonthEnd)
+            )
+
+            // Observe selected currency
+            val currencyFlow = observeSelectedCurrencyUseCase()
+
+            // Combine retry trigger to allow manual refresh
             combine(
-                state.map { it.selectedDateRange }.distinctUntilChanged(),
-                retryTrigger
-            ) { range, _ -> range }
-                .collectLatest { range ->
-                    updateState { it.copy(recentExpenses = UiState.Loading) }
-
-                    val (start, end) = range.getDateBounds()
-
-                    observeExpensesByDateRangeUseCase(
-                        ObserveExpensesByDateRangeUseCase.Params(start, end)
-                    ).collectLatest { transactions ->
-                        // sorting logic
-                        val recent = transactions.sortedByDescending { it.date }.take(5)
-                        updateState { it.copy(recentExpenses = UiState.Success(recent)) }
+                thisMonthFlow,
+                lastMonthFlow,
+                currencyFlow,
+                retryTrigger.map { }
+            ) { thisMonth, lastMonth, currency, _ ->
+                Triple(thisMonth, lastMonth, currency)
+            }
+                .distinctUntilChanged()
+                .catch { t ->
+                    updateState {
+                        it.copy(
+                            recentExpenses = UiState.Error(t.message ?: "Failed to load data")
+                        )
                     }
                 }
-        }
-    }
+                .collectLatest { (thisMonth, lastMonth, currency) ->
+                    // Calculate totals
+                    val thisMonthTotal = calculateExpenseTotal(thisMonth)
+                    val lastMonthTotal = calculateExpenseTotal(lastMonth)
 
-    fun changeDateRange(range: DateRange) {
-        if (state.value.selectedDateRange == range) return
-        updateState { it.copy(selectedDateRange = range) }
-    }
-
-    fun retryRecent() {
-        retryTrigger.update { it + 1 }
-    }
-
-    /* -------------------------------------------------------------------------- */
-    /* Monthly Statistics Logic                                                   */
-    /* -------------------------------------------------------------------------- */
-
-    /**
-     * Observes the full transaction stream to calculate the "This Month vs Last Month" snapshot.
-     */
-    private fun observeMonthlyStats() {
-        viewModelScope.launch {
-            observeExpensesUseCase()
-                .distinctUntilChanged()
-                .collectLatest { allExpenses ->
-                    val now = LocalDateTime.now()
-
-                    // Define Time Windows
-                    val (thisStart, thisEnd) = getMonthBounds(now)
-                    val (lastStart, lastEnd) = getMonthBounds(now.minusMonths(1))
-
-                    // Calculate Totals
-                    val thisMonthTotal = calculateTotal(allExpenses, thisStart, thisEnd)
-                    val lastMonthTotal = calculateTotal(allExpenses, lastStart, lastEnd)
-
-                    // Calculate Trend
+                    // Calculate percentage change
                     val (pctChange, isIncrease) = calculatePercentageChange(
                         thisMonthTotal,
                         lastMonthTotal
                     )
 
-                    // TODO: Connect to real Wallet/Budget source in future modules
-                    val walletBalance = 5631.22
+                    // Get recent 5 transactions (newest first)
+                    val recent = thisMonth
+                        .sortedByDescending { it.date }
+                        .take(5)
 
                     updateState {
                         it.copy(
-                            totalExpenses = thisMonthTotal,
-                            walletBalance = walletBalance,
+                            totalExpensesPaise = thisMonthTotal,
                             percentageChange = pctChange,
-                            isIncrease = isIncrease
+                            isIncrease = isIncrease,
+                            recentExpenses = UiState.Success(recent),
+                            selectedCurrency = currency
                         )
                     }
                 }
         }
+    }
+
+    fun retryRecent() {
+        retryTrigger.update { it + 1 }
     }
 
     /* -------------------------------------------------------------------------- */
@@ -168,10 +177,9 @@ class DashboardViewModel(
             when (val result = refreshExpensesFromSmsUseCase()) {
                 is Result.Success -> {
                     val count = result.data
-                    val msg = if (count > 0) {
-                        "Imported $count new transaction${if (count > 1) "s" else ""}"
-                    } else {
-                        "No new transactions found"
+                    val msg = when {
+                        count > 0 -> "Imported $count new transaction${if (count > 1) "s" else ""}"
+                        else -> "No new transactions found"
                     }
                     updateState { it.copy(isRefreshingSms = false, smsRefreshMessage = msg) }
                 }
@@ -186,7 +194,9 @@ class DashboardViewModel(
         }
     }
 
-    fun clearSmsRefreshMessage() = updateState { it.copy(smsRefreshMessage = null) }
+    fun clearSmsRefreshMessage() {
+        updateState { it.copy(smsRefreshMessage = null) }
+    }
 
     /* -------------------------------------------------------------------------- */
     /* Helpers                                                                    */
@@ -197,39 +207,32 @@ class DashboardViewModel(
     }
 
     /**
-     * Sums up EXPENSE transactions within the given time window.
+     * Sums up EXPENSE transactions only (income excluded).
+     * Returns total in **paise**.
      */
-    private fun calculateTotal(
-        expenses: List<Expense>,
-        start: LocalDateTime,
-        end: LocalDateTime
-    ): Double {
-        return expenses.asSequence()
+    private fun calculateExpenseTotal(expenses: List<Expense>): Long {
+        return expenses
             .filter { it.transactionType == TransactionType.EXPENSE }
-            .filter { !it.date.isBefore(start) && !it.date.isAfter(end) }
-            .sumOf { it.amount }
+            .sumOf { it.amountPaise }
     }
 
     /**
-     * Calculates percentage delta. Returns 100% if previous was 0 but current > 0.
+     * Calculates percentage delta between current and previous period.
+     * Returns (absolutePercentage, isIncrease).
+     *
+     * Special cases:
+     * - If previous = 0 and current > 0 → 100% increase
+     * - If both are 0 → 0% (no change)
      */
-    private fun calculatePercentageChange(current: Double, previous: Double): Pair<Float, Boolean> {
-        val rawChange = when {
-            previous > 0 -> ((current - previous) / previous * 100).toFloat()
-            current > 0 -> 100f
-            else -> 0f
+    private fun calculatePercentageChange(
+        currentPaise: Long,
+        previousPaise: Long
+    ): Pair<Float, Boolean> {
+        if (previousPaise == 0L) {
+            return if (currentPaise > 0L) 100f to true else 0f to false
         }
-        return rawChange.absoluteValue to (rawChange > 0)
-    }
 
-    /**
-     * Returns the exact start (00:00:00) and end (23:59:59.999) of the month for the given date.
-     */
-    private fun getMonthBounds(date: LocalDateTime): Pair<LocalDateTime, LocalDateTime> {
-        val start = date.withDayOfMonth(1).toLocalDate().atStartOfDay()
-        val end = date.withDayOfMonth(date.toLocalDate().lengthOfMonth())
-            .toLocalDate()
-            .atTime(LocalTime.MAX)
-        return start to end
+        val rawChange = ((currentPaise - previousPaise).toFloat() / previousPaise) * 100f
+        return rawChange.absoluteValue to (rawChange > 0f)
     }
 }

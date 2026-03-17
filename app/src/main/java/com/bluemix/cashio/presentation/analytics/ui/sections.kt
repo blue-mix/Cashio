@@ -1,10 +1,8 @@
 package com.bluemix.cashio.presentation.analytics.ui
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
-import com.bluemix.cashio.core.format.CashioFormat.currentMonthLabel
 import com.bluemix.cashio.domain.model.Expense
 import com.bluemix.cashio.domain.model.FinancialStats
 import com.bluemix.cashio.presentation.analytics.vm.BarChartData
@@ -16,21 +14,23 @@ import com.bluemix.cashio.ui.components.cards.StateCardVariant
 import com.bluemix.cashio.ui.components.chart.FinanceChartUi
 import com.bluemix.cashio.ui.components.chart.FinanceStatsCard
 import com.bluemix.cashio.ui.components.chart.SpendingOverviewCard
+import com.bluemix.cashio.ui.theme.toComposeColor
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-private const val CurrencySymbol = "₹"
+private object AnalyticsSectionDefaults {
+    val ChartHeight = 250.dp
+}
+
+/* -------------------------------------------------------------------------- */
+/* Chart                                                                       */
+/* -------------------------------------------------------------------------- */
 
 /**
- * Renders the main chart section of the Analytics screen.
+ * Renders the bar-chart section handling Loading / Error / Success.
  *
- * Handles different UI states (Loading, Error, Success) for the chart data.
- * In the Success state, it renders a bar chart comparing income vs. expenses
- * across the [selectedPeriod].
- *
- * @param chartExpensesState The current UI state of the expense data loading process.
- * @param chartData The processed data points (income, expense, labels) for the chart.
- * @param selectedPeriod The currently selected time period filter.
- * @param onPeriodChange Callback triggered when the user selects a new time period.
+ * Stateless — all data comes from the parent screen.
  */
 @Composable
 fun AnalyticsChartSection(
@@ -43,34 +43,27 @@ fun AnalyticsChartSection(
         is UiState.Success -> {
             val chartUi = remember(chartData) {
                 FinanceChartUi(
-                    incomeData = chartData.incomeData,
-                    expenseData = chartData.expenseData,
+                    incomeDataPaise = chartData.incomeDataPaise,
+                    expenseDataPaise = chartData.expenseDataPaise,
                     labels = chartData.labels
                 )
             }
 
-            if (chartUi.labels.isEmpty()) {
-                StateCard(
-                    variant = StateCardVariant.EMPTY,
-                    title = "No data available",
-                    message = "No data for ${selectedPeriod.label}",
-                    emoji = "📊"
+            if (chartUi.isEmpty) {
+                EmptyChartState(selectedPeriod.label)
+            } else {
+                FinanceStatsCard(
+                    chart = chartUi,
+                    selectedPeriod = selectedPeriod,
+                    onPeriodChange = onPeriodChange
                 )
-                return
             }
-
-            FinanceStatsCard(
-                chart = chartUi,
-                selectedPeriod = selectedPeriod,
-                onPeriodChange = onPeriodChange,
-                currencySymbol = CurrencySymbol
-            )
         }
 
         is UiState.Loading -> {
             StateCard(
                 variant = StateCardVariant.LOADING,
-                height = 250.dp,
+                height = AnalyticsSectionDefaults.ChartHeight,
                 animated = true
             )
         }
@@ -79,7 +72,7 @@ fun AnalyticsChartSection(
             StateCard(
                 variant = StateCardVariant.ERROR,
                 title = "Chart Error",
-                message = chartExpensesState.message ?: "Could not load chart data"
+                message = chartExpensesState.message
             )
         }
 
@@ -87,46 +80,56 @@ fun AnalyticsChartSection(
     }
 }
 
+@Composable
+private fun EmptyChartState(periodLabel: String) {
+    StateCard(
+        variant = StateCardVariant.EMPTY,
+        title = "No data available",
+        message = "No data for $periodLabel",
+        emoji = "📊"
+    )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Summary                                                                     */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Renders the summary cards displaying total income and expenses.
+ * Income / Expense summary with period-over-period deltas.
  *
- * Only renders if [statsState] is [UiState.Success].
- *
- * @param statsState The UI state containing aggregated financial statistics.
- * @param incomeDelta The percentage change in income compared to the previous period.
- * @param expenseDelta The percentage change in expenses compared to the previous period.
- * @param onIncomeClick Callback triggered when the income summary is clicked.
- * @param onExpenseClick Callback triggered when the expense summary is clicked.
+ * Renders only when [statsState] is [UiState.Success].
+ * All monetary values in **paise**.
  */
 @Composable
 fun AnalyticsSummarySection(
     statsState: UiState<FinancialStats>,
-    incomeDelta: Double,
-    expenseDelta: Double,
+    incomeDeltaPaise: Long,
+    expenseDeltaPaise: Long,
     onIncomeClick: () -> Unit,
     onExpenseClick: () -> Unit
 ) {
     val stats = (statsState as? UiState.Success)?.data ?: return
 
     FinancialSummaryCard(
-        totalIncome = stats.totalIncome,
-        totalExpenses = stats.totalExpenses,
-        incomeDelta = incomeDelta,
-        expenseDelta = expenseDelta,
-        currencySymbol = CurrencySymbol,
+        totalIncomePaise = stats.totalIncomePaise,
+        totalExpensesPaise = stats.totalExpensesPaise,
+        incomeDeltaPaise = incomeDeltaPaise,
+        expenseDeltaPaise = expenseDeltaPaise,
+        comparisonLabel = "last month",
         showChevron = true,
         onIncomeClick = onIncomeClick,
         onExpenseClick = onExpenseClick
     )
 }
 
+/* -------------------------------------------------------------------------- */
+/* Top Category                                                                */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Renders a card highlighting the category with the highest spending.
+ * Highlights the category with the highest spending.
  *
- * Only renders if [statsState] is [UiState.Success] and a top category exists.
- *
- * @param statsState The UI state containing aggregated financial statistics.
- * @param topCategoryRatio The ratio (0.0 - 1.0) of the top category's spending relative to total expenses.
+ * All monetary values in **paise**.
  */
 @Composable
 fun AnalyticsTopCategorySection(
@@ -136,15 +139,23 @@ fun AnalyticsTopCategorySection(
     val stats = (statsState as? UiState.Success)?.data ?: return
     val topCategory = stats.topCategory ?: return
 
+    val currentMonthLabel = remember {
+        val formatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
+        LocalDate.now().format(formatter)
+    }
+
+    val topCategoryColor = remember(topCategory.colorHex) {
+        topCategory.colorHex.toComposeColor()
+    }
+
     SpendingOverviewCard(
-        totalAmount = stats.totalExpenses,
-        periodLabel = "Expense in ${LocalDate.now().currentMonthLabel()}",
+        totalAmountPaise = stats.totalExpensesPaise,
+        periodLabel = currentMonthLabel,
         expenseRatio = topCategoryRatio,
         topCategory = topCategory.name,
-        topCategoryAmount = stats.topCategoryAmount,
-        topCategoryIcon = topCategory.icon ?: "💰",
-        topCategoryColor = topCategory.color ?: MaterialTheme.colorScheme.primary,
-        onTopCategoryClick = {},
-        currencySymbol = CurrencySymbol
+        topCategoryAmountPaise = stats.topCategoryAmountPaise,
+        topCategoryIcon = topCategory.icon,
+        topCategoryColor = topCategoryColor,
+        onTopCategoryClick = { /* TODO: Navigate to category details */ }
     )
 }

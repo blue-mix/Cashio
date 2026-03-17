@@ -3,23 +3,26 @@ package com.bluemix.cashio.presentation.analytics.vm
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bluemix.cashio.core.common.Result
-import com.bluemix.cashio.core.format.CashioFormat
 import com.bluemix.cashio.domain.model.DateRange
 import com.bluemix.cashio.domain.model.Expense
 import com.bluemix.cashio.domain.model.TransactionType
 import com.bluemix.cashio.domain.usecase.expense.GetExpensesByDateRangeUseCase
 import com.bluemix.cashio.domain.usecase.expense.GetFinancialStatsUseCase
+import com.bluemix.cashio.domain.usecase.preferences.ObserveSelectedCurrencyUseCase
 import com.bluemix.cashio.presentation.common.UiState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * ViewModel responsible for managing the UI state and business logic of the Analytics screen.
@@ -27,12 +30,16 @@ import java.time.format.DateTimeFormatter
  * This ViewModel coordinates the fetching of financial statistics, calculating period-over-period
  * deltas, and processing transaction data into visualization-ready chart buckets.
  *
+ * **All monetary values use paise (Long) internally.**
+ *
  * @property getFinancialStatsUseCase Use case for retrieving aggregated financial statistics.
  * @property getExpensesByDateRangeUseCase Use case for retrieving raw transaction lists for charting.
+ * @property observeSelectedCurrencyUseCase Use case for observing user's currency preference.
  */
 class AnalyticsViewModel(
     private val getFinancialStatsUseCase: GetFinancialStatsUseCase,
-    private val getExpensesByDateRangeUseCase: GetExpensesByDateRangeUseCase
+    private val getExpensesByDateRangeUseCase: GetExpensesByDateRangeUseCase,
+    private val observeSelectedCurrencyUseCase: ObserveSelectedCurrencyUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AnalyticsState())
@@ -43,7 +50,18 @@ class AnalyticsViewModel(
     val state: StateFlow<AnalyticsState> = _state.asStateFlow()
 
     init {
+        observeCurrency()
         refresh()
+    }
+
+    private fun observeCurrency() {
+        viewModelScope.launch {
+            observeSelectedCurrencyUseCase()
+                .distinctUntilChanged()
+                .collectLatest { currency ->
+                    updateState { it.copy(selectedCurrency = currency) }
+                }
+        }
     }
 
     /**
@@ -87,8 +105,12 @@ class AnalyticsViewModel(
         viewModelScope.launch {
             updateState { it.copy(statsState = UiState.Loading) }
 
-            val currentRange = state.value.selectedDateRange
-            val previousRange = DateRange.LAST_MONTH
+            val currentRange = GetFinancialStatsUseCase.Params(
+                state.value.selectedDateRange
+            )
+            val previousRange = GetFinancialStatsUseCase.Params(
+                state.value.selectedDateRange
+            )
 
             try {
                 coroutineScope {
@@ -102,14 +124,16 @@ class AnalyticsViewModel(
                         val current = currentResult.data
                         val previous = (previousResult as? Result.Success)?.data
 
-                        val incomeDelta =
-                            previous?.let { current.totalIncome - it.totalIncome } ?: 0.0
-                        val expenseDelta =
-                            previous?.let { current.totalExpenses - it.totalExpenses } ?: 0.0
+                        // Calculate deltas in paise
+                        val incomeDeltaPaise =
+                            previous?.let { current.totalIncomePaise - it.totalIncomePaise } ?: 0L
+                        val expenseDeltaPaise =
+                            previous?.let { current.totalExpensesPaise - it.totalExpensesPaise }
+                                ?: 0L
 
                         val topCategoryRatio =
-                            if (current.totalExpenses > 0 && current.topCategory != null) {
-                                (current.topCategoryAmount / current.totalExpenses).toFloat()
+                            if (current.totalExpensesPaise > 0 && current.topCategory != null) {
+                                (current.topCategoryAmountPaise.toFloat() / current.totalExpensesPaise.toFloat())
                             } else 0f
 
                         updateState {
@@ -117,8 +141,8 @@ class AnalyticsViewModel(
                                 statsState = UiState.Success(current),
                                 categoryBreakdown = current.categoryBreakdown,
                                 topCategoryRatio = topCategoryRatio,
-                                incomeDelta = incomeDelta,
-                                expenseDelta = expenseDelta
+                                incomeDeltaPaise = incomeDeltaPaise,
+                                expenseDeltaPaise = expenseDeltaPaise
                             )
                         }
                     } else {
@@ -189,20 +213,21 @@ class AnalyticsViewModel(
 
     /**
      * Aggregates expenses into weekly buckets (approx. 5 weeks) for the current month.
+     * All values in paise (Long).
      */
     private fun buildWeeklyBuckets(expenses: List<Expense>): BarChartData {
         val currentMonth = YearMonth.now()
-        val totals = mutableMapOf<Int, Pair<Double, Double>>()
+        val totals = mutableMapOf<Int, Pair<Long, Long>>()
 
         expenses.forEach { e ->
             val date = e.date.toLocalDate()
             if (YearMonth.from(date) == currentMonth) {
                 val weekIndex = (date.dayOfMonth - 1) / 7
-                val (inc, exp) = totals.getOrDefault(weekIndex, 0.0 to 0.0)
+                val (inc, exp) = totals.getOrDefault(weekIndex, 0L to 0L)
                 totals[weekIndex] = if (e.transactionType == TransactionType.INCOME) {
-                    (inc + e.amount) to exp
+                    (inc + e.amountPaise) to exp
                 } else {
-                    inc to (exp + e.amount)
+                    inc to (exp + e.amountPaise)
                 }
             }
         }
@@ -210,36 +235,40 @@ class AnalyticsViewModel(
         val weeksCount = 5
         return BarChartData(
             labels = (1..weeksCount).map { "W$it" },
-            incomeData = (0 until weeksCount).map { totals[it]?.first ?: 0.0 },
-            expenseData = (0 until weeksCount).map { totals[it]?.second ?: 0.0 }
+            incomeDataPaise = (0 until weeksCount).map { totals[it]?.first ?: 0L },
+            expenseDataPaise = (0 until weeksCount).map { totals[it]?.second ?: 0L }
         )
     }
 
     /**
      * Aggregates expenses into monthly buckets for the last 6 months.
+     * All values in paise (Long).
      */
     private fun buildMonthlyBuckets(expenses: List<Expense>): BarChartData {
         val months = (5 downTo 0).map { YearMonth.now().minusMonths(it.toLong()) }
-        val formatter = DateTimeFormatter.ofPattern("MMM", CashioFormat.locale())
+        val formatter = DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
 
         val totals = expenses.groupBy { YearMonth.from(it.date.toLocalDate()) }
             .mapValues { (_, list) ->
-                val income =
-                    list.filter { it.transactionType == TransactionType.INCOME }.sumOf { it.amount }
-                val expense = list.filter { it.transactionType == TransactionType.EXPENSE }
-                    .sumOf { it.amount }
+                val income = list
+                    .filter { it.transactionType == TransactionType.INCOME }
+                    .sumOf { it.amountPaise }
+                val expense = list
+                    .filter { it.transactionType == TransactionType.EXPENSE }
+                    .sumOf { it.amountPaise }
                 income to expense
             }
 
         return BarChartData(
             labels = months.map { it.format(formatter) },
-            incomeData = months.map { totals[it]?.first ?: 0.0 },
-            expenseData = months.map { totals[it]?.second ?: 0.0 }
+            incomeDataPaise = months.map { totals[it]?.first ?: 0L },
+            expenseDataPaise = months.map { totals[it]?.second ?: 0L }
         )
     }
 
     /**
      * Aggregates expenses into yearly buckets for the last 4 years.
+     * All values in paise (Long).
      */
     private fun buildYearlyBuckets(expenses: List<Expense>): BarChartData {
         val currentYear = LocalDate.now().year
@@ -247,17 +276,19 @@ class AnalyticsViewModel(
 
         val totals = expenses.groupBy { it.date.year }
             .mapValues { (_, list) ->
-                val income =
-                    list.filter { it.transactionType == TransactionType.INCOME }.sumOf { it.amount }
-                val expense = list.filter { it.transactionType == TransactionType.EXPENSE }
-                    .sumOf { it.amount }
+                val income = list
+                    .filter { it.transactionType == TransactionType.INCOME }
+                    .sumOf { it.amountPaise }
+                val expense = list
+                    .filter { it.transactionType == TransactionType.EXPENSE }
+                    .sumOf { it.amountPaise }
                 income to expense
             }
 
         return BarChartData(
             labels = years.map { it.toString() },
-            incomeData = years.map { totals[it]?.first ?: 0.0 },
-            expenseData = years.map { totals[it]?.second ?: 0.0 }
+            incomeDataPaise = years.map { totals[it]?.first ?: 0L },
+            expenseDataPaise = years.map { totals[it]?.second ?: 0L }
         )
     }
 

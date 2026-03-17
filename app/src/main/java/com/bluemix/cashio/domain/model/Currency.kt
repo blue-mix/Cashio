@@ -1,7 +1,10 @@
 package com.bluemix.cashio.domain.model
 
 /**
- * Supported currencies
+ * Supported currencies.
+ *
+ * Note: JPY and CNY intentionally share the ¥ symbol. Display logic in the
+ * presentation layer should use [code] for disambiguation where needed.
  */
 data class Currency(
     val code: String,
@@ -16,12 +19,25 @@ data class Currency(
         val JPY = Currency("JPY", "¥", "Japanese Yen")
         val AUD = Currency("AUD", "A$", "Australian Dollar")
         val CAD = Currency("CAD", "C$", "Canadian Dollar")
-        val CNY = Currency("CNY", "¥", "Chinese Yuan")
+        val CNY = Currency("CNY", "¥", "Chinese Yuan")   // ¥ shared with JPY — disambiguate by code
 
-        fun getAll(): List<Currency> = listOf(
-            USD, EUR, GBP, INR, JPY, AUD, CAD, CNY
-        )
+        /** All supported currencies in display order. */
+        val ALL: List<Currency> by lazy {
+            listOf(USD, EUR, GBP, INR, JPY, AUD, CAD, CNY)
+        }
 
-        fun fromCode(code: String): Currency? = getAll().find { it.code == code } ?: INR
+        private val BY_CODE: Map<String, Currency> by lazy {
+            ALL.associateBy { it.code }
+        }
+
+        /**
+         * Returns the [Currency] for [code], or `null` if the code is unrecognised.
+         *
+         * Callers should provide a sensible fallback:
+         * ```
+         * val currency = Currency.fromCode(savedCode) ?: Currency.INR
+         * ```
+         */
+        fun fromCode(code: String): Currency? = BY_CODE[code.uppercase()]
     }
 }

@@ -1,3 +1,171 @@
+//package com.bluemix.cashio.presentation.keywordmapping
+//
+//import androidx.lifecycle.viewModelScope
+//import com.bluemix.cashio.core.common.Result
+//import com.bluemix.cashio.domain.model.KeywordMapping
+//import com.bluemix.cashio.domain.usecase.keywordmapping.AddKeywordMappingUseCase
+//import com.bluemix.cashio.domain.usecase.keywordmapping.DeleteKeywordMappingUseCase
+//import com.bluemix.cashio.domain.usecase.keywordmapping.ObserveKeywordMappingsUseCase
+//import com.bluemix.cashio.domain.usecase.keywordmapping.UpdateKeywordMappingUseCase
+//import com.bluemix.cashio.presentation.common.BaseViewModel
+//import kotlinx.coroutines.flow.MutableStateFlow
+//import kotlinx.coroutines.flow.StateFlow
+//import kotlinx.coroutines.flow.asStateFlow
+//import kotlinx.coroutines.flow.update
+//import kotlinx.coroutines.launch
+//import java.util.UUID
+//
+///**
+// * Editing state for the add / edit keyword mapping dialog.
+// */
+//data class KeywordMappingEditorState(
+//    val mappingId: String? = null,      // null = add mode
+//    val keyword: String = "",
+//    val categoryId: String = "",
+//    val priority: Int = 5,
+//    val isSaving: Boolean = false
+//) {
+//    val isEditMode: Boolean get() = mappingId != null
+//}
+//
+//data class KeywordMappingUiState(
+//    val mappings: List<KeywordMapping> = emptyList(),
+//    val isLoading: Boolean = true,
+//    val editor: KeywordMappingEditorState? = null,     // non-null = dialog open
+//    val message: String? = null,
+//    val isError: Boolean = false
+//)
+//
+//class KeywordMappingViewModel(
+//    private val observeKeywordMappingsUseCase: ObserveKeywordMappingsUseCase,
+//    private val addKeywordMappingUseCase: AddKeywordMappingUseCase,
+//    private val updateKeywordMappingUseCase: UpdateKeywordMappingUseCase,
+//    private val deleteKeywordMappingUseCase: DeleteKeywordMappingUseCase
+//) : BaseViewModel() {
+//
+//    private val _uiState = MutableStateFlow(KeywordMappingUiState())
+//    val uiState: StateFlow<KeywordMappingUiState> = _uiState.asStateFlow()
+//
+//    init {
+//        // Reactive — no manual reloads after mutations.
+//        viewModelScope.launch {
+//            observeKeywordMappingsUseCase().collect { mappings ->
+//                _uiState.update { it.copy(mappings = mappings, isLoading = false) }
+//            }
+//        }
+//    }
+//
+//    // ── Dialog open/close ──────────────────────────────────────────────────
+//
+//    fun openAddMapping(defaultCategoryId: String = "") {
+//        _uiState.update {
+//            it.copy(editor = KeywordMappingEditorState(categoryId = defaultCategoryId))
+//        }
+//    }
+//
+//    fun openEditMapping(mapping: KeywordMapping) {
+//        _uiState.update {
+//            it.copy(
+//                editor = KeywordMappingEditorState(
+//                    mappingId  = mapping.id,
+//                    keyword    = mapping.keyword,
+//                    categoryId = mapping.categoryId,
+//                    priority   = mapping.priority
+//                )
+//            )
+//        }
+//    }
+//
+//    fun closeEditor() = _uiState.update { it.copy(editor = null) }
+//
+//    // ── Editor field updates ───────────────────────────────────────────────
+//
+//    fun setKeyword(keyword: String) =
+//        _uiState.update { it.copy(editor = it.editor?.copy(keyword = keyword)) }
+//
+//    fun setCategoryId(categoryId: String) =
+//        _uiState.update { it.copy(editor = it.editor?.copy(categoryId = categoryId)) }
+//
+//    fun setPriority(priority: Int) =
+//        _uiState.update { it.copy(editor = it.editor?.copy(priority = priority.coerceIn(0, 10))) }
+//
+//    // ── Save ───────────────────────────────────────────────────────────────
+//
+//    fun saveMapping() {
+//        val editor = _uiState.value.editor ?: return
+//        if (editor.isSaving) return
+//
+//        if (editor.keyword.isBlank()) {
+//            _uiState.update { it.copy(message = "Keyword is required", isError = true) }
+//            return
+//        }
+//        if (editor.categoryId.isBlank()) {
+//            _uiState.update { it.copy(message = "Please select a category", isError = true) }
+//            return
+//        }
+//
+//        _uiState.update { it.copy(editor = it.editor?.copy(isSaving = true)) }
+//
+//        viewModelScope.launch {
+//            val mapping = KeywordMapping(
+//                id         = editor.mappingId ?: UUID.randomUUID().toString(),
+//                keyword    = editor.keyword.trim().lowercase(),
+//                categoryId = editor.categoryId,
+//                priority   = editor.priority
+//            )
+//
+//            val result = if (editor.isEditMode) {
+//                updateKeywordMappingUseCase(mapping)
+//            } else {
+//                addKeywordMappingUseCase(mapping)
+//            }
+//
+//            when (result) {
+//                is Result.Success -> {
+//                    // AddKeywordMappingUseCase / UpdateKeywordMappingUseCase already trigger
+//                    // retroactive recategorisation internally — no separate call needed here.
+//                    // The result of recategorisation is intentionally not surfaced as an error
+//                    // since the save itself succeeded.
+//                    _uiState.update {
+//                        it.copy(
+//                            editor  = null,
+//                            message = if (editor.isEditMode) "Mapping updated" else "Mapping added",
+//                            isError = false
+//                        )
+//                    }
+//                }
+//                is Result.Error -> {
+//                    _uiState.update {
+//                        it.copy(
+//                            editor  = it.editor?.copy(isSaving = false),
+//                            message = result.message,
+//                            isError = true
+//                        )
+//                    }
+//                }
+//                else -> _uiState.update { it.copy(editor = it.editor?.copy(isSaving = false)) }
+//            }
+//        }
+//    }
+//
+//    // ── Delete ─────────────────────────────────────────────────────────────
+//
+//    fun deleteMapping(mapping: KeywordMapping) {
+//        viewModelScope.launch {
+//            when (val result = deleteKeywordMappingUseCase(mapping.id)) {
+//                is Result.Success -> _uiState.update {
+//                    it.copy(message = "Mapping deleted", isError = false)
+//                }
+//                is Result.Error -> _uiState.update {
+//                    it.copy(message = result.message, isError = true)
+//                }
+//                else -> Unit
+//            }
+//        }
+//    }
+//
+//    fun dismissMessage() = _uiState.update { it.copy(message = null, isError = false) }
+//}
 package com.bluemix.cashio.presentation.keyword
 
 import android.util.Log
@@ -8,10 +176,10 @@ import com.bluemix.cashio.domain.model.Category
 import com.bluemix.cashio.domain.model.KeywordMapping
 import com.bluemix.cashio.domain.usecase.category.GetCategoriesUseCase
 import com.bluemix.cashio.domain.usecase.expense.RecategorizeExpensesByKeywordUseCase
-import com.bluemix.cashio.domain.usecase.keyword.AddKeywordMappingUseCase
-import com.bluemix.cashio.domain.usecase.keyword.DeleteKeywordMappingUseCase
-import com.bluemix.cashio.domain.usecase.keyword.GetKeywordMappingsUseCase
-import com.bluemix.cashio.domain.usecase.keyword.UpdateKeywordMappingUseCase
+import com.bluemix.cashio.domain.usecase.keywordmapping.AddKeywordMappingUseCase
+import com.bluemix.cashio.domain.usecase.keywordmapping.DeleteKeywordMappingUseCase
+import com.bluemix.cashio.domain.usecase.keywordmapping.GetKeywordMappingsUseCase
+import com.bluemix.cashio.domain.usecase.keywordmapping.UpdateKeywordMappingUseCase
 import com.bluemix.cashio.presentation.common.UiState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope

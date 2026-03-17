@@ -5,6 +5,7 @@ kotlin = "2.0.21"
 coreKtx = "1.17.0"
 coreSplashscreen = "1.2.0"
 androidxDatastore = "1.1.1"
+androidxWork = "2.10.0"
 
 # Compose & UI
 composeBom = "2025.03.00"
@@ -23,6 +24,9 @@ realmKotlin = "3.0.0"
 
 # Koin
 koin = "4.0.0"
+
+desugar = "2.1.4"
+kizitonwoseCalendar = "2.6.0"
 
 # Coroutines
 coroutines = "1.9.0"
@@ -86,6 +90,9 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+
+kizitonwose-calendar-compose = { module = "com.kizitonwose.calendar:compose", version.ref = "kizitonwoseCalendar" }
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "androidxWork" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

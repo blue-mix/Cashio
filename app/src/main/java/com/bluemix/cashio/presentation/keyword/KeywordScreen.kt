@@ -42,25 +42,21 @@ import com.bluemix.cashio.presentation.common.UiState
 import com.bluemix.cashio.ui.components.cards.StateCard
 import com.bluemix.cashio.ui.components.cards.StateCardAction
 import com.bluemix.cashio.ui.components.cards.StateCardVariant
-import com.bluemix.cashio.ui.components.defaults.CashioPadding
-import com.bluemix.cashio.ui.components.defaults.CashioRadius
-import com.bluemix.cashio.ui.components.defaults.CashioSpacing
-import com.bluemix.cashio.ui.components.defaults.CashioTopBar
-import com.bluemix.cashio.ui.components.defaults.CashioTopBarTitle
-import com.bluemix.cashio.ui.components.defaults.TopBarAction
-import com.bluemix.cashio.ui.components.defaults.TopBarIcon
+import com.bluemix.cashio.ui.defaults.CashioPadding
+import com.bluemix.cashio.ui.defaults.CashioRadius
+import com.bluemix.cashio.ui.defaults.CashioSpacing
+import com.bluemix.cashio.ui.defaults.CashioTopBar
+import com.bluemix.cashio.ui.defaults.CashioTopBarTitle
+import com.bluemix.cashio.ui.defaults.TopBarAction
+import com.bluemix.cashio.ui.defaults.TopBarIcon
 import org.koin.compose.viewmodel.koinViewModel
 import java.util.Locale
 
 /**
- * Screen for managing Keyword Mappings (Auto-categorization rules).
+ * Keyword-mapping management screen.
  *
- * Allows users to:
- * 1. Define keywords (e.g., "Starbucks", "Uber").
- * 2. Assign a target Category (e.g., "Coffee", "Transport").
- * 3. Set a priority level for conflict resolution.
- *
- * When rules are saved, the system automatically re-categorizes historic SMS transactions.
+ * ViewModel interaction is confined here.
+ * All child composables are stateless.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +67,7 @@ fun KeywordMappingScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Efficiently map Category IDs to Objects for list display
+    // Derived state — category lookup map
     val categoriesById: Map<String, Category> by remember(state.categories) {
         derivedStateOf {
             (state.categories as? UiState.Success)?.data
@@ -80,14 +76,13 @@ fun KeywordMappingScreen(
         }
     }
 
-    // Client-side search filtering
+    // Client-side search
     val filteredMappings by remember(state.mappings, state.query) {
         derivedStateOf {
             val all = (state.mappings as? UiState.Success)?.data.orEmpty()
             val q = state.query.trim().lowercase(Locale.ENGLISH)
-            if (q.isBlank()) all else all.filter {
-                it.keyword.lowercase(Locale.ENGLISH).contains(q)
-            }
+            if (q.isBlank()) all
+            else all.filter { it.keyword.lowercase(Locale.ENGLISH).contains(q) }
         }
     }
 
@@ -104,9 +99,9 @@ fun KeywordMappingScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { viewModel.openAddSheet() },
+                onClick = viewModel::openAddSheet,
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
-                shape = RoundedCornerShape(CashioRadius.mediumSmall)
+                shape = RoundedCornerShape(CashioRadius.small)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add mapping")
             }
@@ -118,9 +113,9 @@ fun KeywordMappingScreen(
                 .padding(padding)
                 .padding(horizontal = CashioPadding.screen)
         ) {
-            Spacer(Modifier.height(CashioSpacing.medium))
+            Spacer(Modifier.height(CashioSpacing.sm))
 
-            // Search Bar
+            // Search
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
@@ -137,9 +132,9 @@ fun KeywordMappingScreen(
                 shape = RoundedCornerShape(CashioRadius.small)
             )
 
-            Spacer(Modifier.height(CashioSpacing.medium))
+            Spacer(Modifier.height(CashioSpacing.sm))
 
-            // Content State
+            // Content
             when (val mappingsState = state.mappings) {
                 is UiState.Loading, UiState.Idle -> {
                     StateCard(variant = StateCardVariant.LOADING, animated = true)
@@ -148,7 +143,7 @@ fun KeywordMappingScreen(
                 is UiState.Error -> {
                     StateCard(
                         variant = StateCardVariant.ERROR,
-                        title = "Couldn’t load mappings",
+                        title = "Couldn't load mappings",
                         message = mappingsState.message,
                         action = StateCardAction("Retry", viewModel::load)
                     )
@@ -162,9 +157,8 @@ fun KeywordMappingScreen(
                             emoji = if (isSearchEmpty) "⌨️" else "🔍",
                             title = if (isSearchEmpty) "No mappings yet" else "No matches",
                             message = if (isSearchEmpty)
-                                "Add keywords like “swiggy” or “uber” to auto-categorize SMS."
-                            else
-                                "Try a different search term.",
+                                "Add keywords like 'swiggy' or 'uber' to auto-categorize SMS."
+                            else "Try a different search term.",
                             action = StateCardAction(
                                 text = if (isSearchEmpty) "Add Mapping" else "Clear Search",
                                 onClick = {
@@ -177,7 +171,7 @@ fun KeywordMappingScreen(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = 96.dp),
-                            verticalArrangement = Arrangement.spacedBy(CashioSpacing.compact)
+                            verticalArrangement = Arrangement.spacedBy(CashioSpacing.sm)
                         ) {
                             items(filteredMappings, key = { it.id }) { mapping ->
                                 MappingRow(
@@ -195,7 +189,7 @@ fun KeywordMappingScreen(
             }
         }
 
-        // Overlay Banner for Operations (Success/Error feedback)
+        // Banner overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -214,22 +208,24 @@ fun KeywordMappingScreen(
         }
     }
 
-    // --- Dialogs & Bottom Sheets ---
-
+    // Delete confirmation
     state.confirmDelete?.let { target ->
         AlertDialog(
             onDismissRequest = viewModel::dismissDelete,
             title = { Text("Delete mapping?") },
-            text = { Text("Keyword “${target.keyword}” will stop auto-categorizing future expenses.") },
+            text = { Text("Keyword '${target.keyword}' will stop auto-categorizing future expenses.") },
             confirmButton = {
                 TextButton(onClick = viewModel::deleteConfirmed) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = viewModel::dismissDelete) { Text("Cancel") } }
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDelete) { Text("Cancel") }
+            }
         )
     }
 
+    // Editor sheet
     if (state.isSheetOpen) {
         ModalBottomSheet(
             onDismissRequest = viewModel::closeSheet,

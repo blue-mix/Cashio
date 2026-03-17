@@ -3,76 +3,57 @@ package com.bluemix.cashio.ui.components.cards
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bluemix.cashio.ui.components.defaults.CashioPadding
-import com.bluemix.cashio.ui.components.defaults.CashioRadius
-import com.bluemix.cashio.ui.components.defaults.CashioSpacing
+import com.bluemix.cashio.ui.defaults.CashioPadding
+import com.bluemix.cashio.ui.defaults.CashioRadius
+import com.bluemix.cashio.ui.defaults.CashioSpacing
 
-/**
- * Visual styles for the state card.
- */
 enum class StateCardVariant {
-    /** Shows a centered circular progress indicator. */
     LOADING,
-
-    /** Standard layout for empty states or information. */
     EMPTY,
-
-    /** Styled with error container colors to indicate failure. */
     ERROR
 }
 
-/**
- * Configuration for an action button displayed at the bottom of the card.
- *
- * @property text The button label.
- * @property onClick The callback when the button is clicked.
- * @property outlined If true, renders an [OutlinedButton]; otherwise, a filled [Button].
- */
 data class StateCardAction(
     val text: String,
     val onClick: () -> Unit,
     val outlined: Boolean = false
 )
 
+// Constants for consistency
+private object StateCardDefaults {
+    val TonalElevation = 2.dp
+    val ShadowElevation = 2.dp
+    val EmojiSize = 44.sp
+    val LoadingMinHeight = 120.dp
+}
+
 /**
- * A versatile card component used to display UI states (Loading, Empty, Error).
+ * Versatile state card for loading, empty, and error states.
  *
- * It supports optional animation on entry, custom emojis, and action buttons.
+ * Uses [rememberSaveable] to prevent animation replay when navigating
+ * back to a screen (e.g., after popping from the back stack).
  *
- * @param variant The visual mode of the card ([StateCardVariant.LOADING], [StateCardVariant.EMPTY], etc.).
- * @param title Optional headline text.
- * @param message Optional body text explaining the state.
- * @param emoji Optional large emoji displayed at the top (e.g., "😕" for errors).
- * @param height Optional fixed height. If null, the card wraps its content.
- * @param action Optional CTA button configuration.
- * @param animated If true, the card enters the screen with a fade+scale animation.
- * @param contentPadding Padding applied inside the card container.
+ * @param variant The type of state to display
+ * @param title Optional headline text
+ * @param message Optional body text with more context
+ * @param emoji Optional decorative emoji
+ * @param height Fixed height (null for wrap content)
+ * @param action Optional action button
+ * @param animated Whether to animate the card entrance
+ * @param contentPadding Internal padding (defaults to card padding)
  */
 @Composable
 fun StateCard(
@@ -86,96 +67,45 @@ fun StateCard(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(CashioPadding.card)
 ) {
-    val visible = remember { mutableStateOf(!animated) }
-
-    // Trigger animation if enabled
-    LaunchedEffect(animated) {
-        if (animated) visible.value = true
+    // rememberSaveable: survives recomposition and back-stack restoration
+    var visible by rememberSaveable(key = "state_card_visibility") {
+        mutableStateOf(!animated)
     }
 
-    // Determine colors based on variant
-    val (bg, fg) = when (variant) {
-        StateCardVariant.ERROR -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-        else -> MaterialTheme.colorScheme.surface to MaterialTheme.colorScheme.onSurface
+    LaunchedEffect(Unit) {
+        if (animated && !visible) {
+            visible = true
+        }
     }
+    val colors = StateCardColors.current(variant)
 
-    // Content composable definition
-    val cardContent = @Composable {
+    val cardContent: @Composable () -> Unit = {
         Surface(
             modifier = modifier
                 .fillMaxWidth()
                 .then(if (height != null) Modifier.height(height) else Modifier),
             shape = RoundedCornerShape(CashioRadius.medium),
-            color = bg,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp
+            color = colors.background,
+            tonalElevation = StateCardDefaults.TonalElevation,
+            shadowElevation = StateCardDefaults.ShadowElevation
         ) {
             when (variant) {
-                StateCardVariant.LOADING -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(
-                                if (height != null) Modifier.height(height)
-                                else Modifier.padding(CashioSpacing.huge)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-
-                else -> {
-                    Column(
-                        modifier = Modifier.padding(contentPadding),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(CashioSpacing.compact)
-                    ) {
-                        if (!emoji.isNullOrBlank()) {
-                            Text(text = emoji, fontSize = 44.sp)
-                        }
-                        if (!title.isNullOrBlank()) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = fg,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                        if (!message.isNullOrBlank()) {
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (variant == StateCardVariant.ERROR) fg else MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-
-                        action?.let { act ->
-                            Spacer(Modifier.height(CashioSpacing.xs))
-                            if (act.outlined) {
-                                OutlinedButton(
-                                    onClick = act.onClick,
-                                    shape = RoundedCornerShape(CashioRadius.mediumSmall)
-                                ) { Text(act.text) }
-                            } else {
-                                Button(
-                                    onClick = act.onClick,
-                                    shape = RoundedCornerShape(CashioRadius.mediumSmall)
-                                ) { Text(act.text) }
-                            }
-                        }
-                    }
-                }
+                StateCardVariant.LOADING -> LoadingContent(height)
+                else -> MessageContent(
+                    emoji = emoji,
+                    title = title,
+                    message = message,
+                    action = action,
+                    colors = colors,
+                    contentPadding = contentPadding
+                )
             }
         }
     }
 
-    // Render with or without animation wrapper
     if (animated) {
         AnimatedVisibility(
-            visible = visible.value,
+            visible = visible,
             enter = fadeIn() + scaleIn(),
             label = "StateCardAnimatedVisibility"
         ) {
@@ -183,5 +113,112 @@ fun StateCard(
         }
     } else {
         cardContent()
+    }
+}
+
+@Composable
+private fun LoadingContent(height: Dp?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (height != null) Modifier.height(height)
+                else Modifier.height(StateCardDefaults.LoadingMinHeight)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+private fun MessageContent(
+    emoji: String?,
+    title: String?,
+    message: String?,
+    action: StateCardAction?,
+    colors: StateCardColors,
+    contentPadding: PaddingValues
+) {
+    Column(
+        modifier = Modifier.padding(contentPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(CashioSpacing.sm)
+    ) {
+        if (!emoji.isNullOrBlank()) {
+            Text(
+                text = emoji,
+                fontSize = StateCardDefaults.EmojiSize
+            )
+        }
+
+        if (!title.isNullOrBlank()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.title,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        if (!message.isNullOrBlank()) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.message,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        action?.let { act ->
+            Spacer(Modifier.height(CashioSpacing.xs))
+
+            if (act.outlined) {
+                OutlinedButton(
+                    onClick = act.onClick,
+                    shape = RoundedCornerShape(CashioRadius.small)
+                ) {
+                    Text(act.text)
+                }
+            } else {
+                Button(
+                    onClick = act.onClick,
+                    shape = RoundedCornerShape(CashioRadius.small)
+                ) {
+                    Text(act.text)
+                }
+            }
+        }
+    }
+}
+
+@Immutable
+private data class StateCardColors(
+    val background: Color,
+    val title: Color,
+    val message: Color
+) {
+    companion object {
+        // Remove the @Composable here if you want to use it in remember,
+        // OR just call it directly in the UI body.
+        @Composable
+        fun current(variant: StateCardVariant): StateCardColors {
+            val cs = MaterialTheme.colorScheme
+            return when (variant) {
+                StateCardVariant.ERROR -> StateCardColors(
+                    background = cs.errorContainer,
+                    title = cs.onErrorContainer,
+                    message = cs.onErrorContainer
+                )
+                else -> StateCardColors(
+                    background = cs.surface,
+                    title = cs.onSurface,
+                    message = cs.onSurfaceVariant
+                )
+            }
+        }
     }
 }

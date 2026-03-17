@@ -10,7 +10,9 @@ data class SettingsState(
     val notificationAccessGranted: Boolean = false,
     val keywordMappings: UiState<List<KeywordMapping>> = UiState.Idle,
     val message: SettingsMessage? = null,
-    val darkModeEnabled: Boolean = false
+    val darkModeEnabled: Boolean = false,
+    val showClearDataConfirmation: Boolean = false,
+    val isClearingData: Boolean = false
 )
 
 sealed class SettingsMessage {

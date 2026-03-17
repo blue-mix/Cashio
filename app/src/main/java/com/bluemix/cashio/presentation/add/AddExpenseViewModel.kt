@@ -58,6 +58,8 @@ data class AddExpenseState(
  * 2. Fetches available Categories for the dropdown.
  * 3. Handles switching between "Add" and "Edit" modes based on navigation arguments.
  * 4. Persists the transaction to the database via UseCases.
+ *
+ * **All monetary values are converted to paise (Long) before saving.**
  */
 class AddExpenseViewModel(
     private val getCategoriesUseCase: GetCategoriesUseCase,
@@ -122,14 +124,15 @@ class AddExpenseViewModel(
                 is Result.Success -> {
                     result.data?.let { expense ->
                         updateState { current ->
-                            // Attempt to map the expense's category to the loaded list
                             val categories =
                                 (current.categories as? UiState.Success)?.data.orEmpty()
                             val matchingCategory = categories.find { it.id == expense.category.id }
                                 ?: expense.category
 
+                            val amountDisplay = (expense.amountPaise / 100.0).toString()
+
                             current.copy(
-                                amount = expense.amount.toString(),
+                                amount = amountDisplay,
                                 title = expense.title,
                                 selectedCategory = matchingCategory,
                                 transactionType = expense.transactionType,
@@ -173,23 +176,30 @@ class AddExpenseViewModel(
         val current = state.value
 
         // Validation
-        val amount = current.amount.toDoubleOrNull()
-        if (amount == null || amount <= 0.0) return setError("Please enter a valid amount")
+        val amountDouble = current.amount.toDoubleOrNull()
+        if (amountDouble == null || amountDouble <= 0.0) {
+            return setError("Please enter a valid amount")
+        }
         if (current.title.isBlank()) return setError("Please enter a title")
         if (current.selectedCategory == null) return setError("Please select a category")
 
         viewModelScope.launch {
             updateState { it.copy(isSaving = true, errorMessage = null) }
 
+            // ✅ FIX: Convert Double → Long (paise)
+            val amountPaise = (amountDouble * 100).toLong()
+
             val expense = Expense(
                 id = current.editingExpenseId ?: "exp_${UUID.randomUUID()}",
-                amount = amount,
+                amountPaise = amountPaise,  // ✅ FIX
                 title = current.title.trim(),
                 category = current.selectedCategory,
                 date = current.date,
                 note = current.note.trim(),
                 source = ExpenseSource.MANUAL,
-                transactionType = current.transactionType
+                transactionType = current.transactionType,
+                rawSmsBody = null,
+                merchantName = null
             )
 
             val result = if (current.isEditMode) {

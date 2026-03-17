@@ -1,5 +1,6 @@
 package com.bluemix.cashio.presentation.transaction
 
+import com.bluemix.cashio.domain.model.Currency
 import com.bluemix.cashio.domain.model.Expense
 import com.bluemix.cashio.presentation.common.UiState
 
@@ -11,6 +12,11 @@ enum class TransactionSort {
     TITLE_ASC, TITLE_DESC
 }
 
+/**
+ * State for the Transactions screen.
+ *
+ * All monetary values are in **paise (Long)** within the Expense objects.
+ */
 data class TransactionsState(
     // Cache
     val allTransactions: List<Expense> = emptyList(),
@@ -29,6 +35,9 @@ data class TransactionsState(
     // Delete UI
     val isDeleting: Boolean = false,
     val deleteSuccess: Boolean = false,
+
+    // Currency
+    val selectedCurrency: Currency = Currency.INR,
 
     // Banner/snackbar
     val message: String? = null

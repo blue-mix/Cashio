@@ -1,3 +1,4 @@
+
 package com.bluemix.cashio.ui.components.cards
 
 import androidx.compose.animation.AnimatedContent
@@ -13,13 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,45 +25,43 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bluemix.cashio.R
 import com.bluemix.cashio.core.format.CashioFormat
-import com.bluemix.cashio.ui.components.defaults.CashioCard
-import com.bluemix.cashio.ui.components.defaults.CashioIcon
-import com.bluemix.cashio.ui.components.defaults.CashioRadius
-import com.bluemix.cashio.ui.components.defaults.CashioSpacing
+import com.bluemix.cashio.domain.model.Currency
+import com.bluemix.cashio.ui.defaults.CashioCard
+import com.bluemix.cashio.ui.defaults.CashioIcon
+import com.bluemix.cashio.ui.defaults.CashioRadius
+import com.bluemix.cashio.ui.defaults.CashioSpacing
 import com.bluemix.cashio.ui.theme.CashioSemantic
 import kotlin.math.abs
 
-/**
- * A dashboard card that displays the high-level financial summary:
- * Total Income vs Total Expenses, along with comparative deltas.
- *
- * @param totalIncome Current period's total income.
- * @param totalExpenses Current period's total expenses.
- * @param incomeDelta Difference in income compared to the previous period.
- * @param expenseDelta Difference in expenses compared to the previous period.
- * @param comparisonLabel Label explaining the delta (e.g., "last month").
- * @param showChevron Whether to show navigation indicators.
- */
+// Animation constants
+private object FinancialSummaryAnimations {
+    const val PressScale = 0.985f
+    const val NormalScale = 1f
+    val SpringSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy)
+}
+
 @Composable
 fun FinancialSummaryCard(
-    totalIncome: Double,
-    totalExpenses: Double,
-    incomeDelta: Double,
-    expenseDelta: Double,
-    currencySymbol: String = "₹",
+    totalIncomePaise: Long,
+    totalExpensesPaise: Long,
+    incomeDeltaPaise: Long,
+    expenseDeltaPaise: Long,
+    currency: Currency = Currency.INR,
     comparisonLabel: String = "last month",
     showChevron: Boolean = true,
     onIncomeClick: () -> Unit = {},
@@ -78,11 +71,11 @@ fun FinancialSummaryCard(
     CashioCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(CashioSpacing.xs)) {
             MetricRow(
-                leadingIcon = ICON_INCOME,
-                label = LABEL_INCOME,
-                amount = totalIncome,
-                delta = incomeDelta,
-                currencySymbol = currencySymbol,
+                leadingIcon = CashioIcon.Drawable(R.drawable.uptrend),
+                label = "Income",
+                amountPaise = totalIncomePaise,
+                deltaPaise = incomeDeltaPaise,
+                currency = currency,
                 comparisonLabel = comparisonLabel,
                 isIncomeRow = true,
                 showChevron = showChevron,
@@ -90,16 +83,16 @@ fun FinancialSummaryCard(
             )
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = CashioSpacing.small),
+                modifier = Modifier.padding(vertical = CashioSpacing.xs),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
             MetricRow(
-                leadingIcon = ICON_EXPENSE,
-                label = LABEL_EXPENSE,
-                amount = totalExpenses,
-                delta = expenseDelta,
-                currencySymbol = currencySymbol,
+                leadingIcon = CashioIcon.Drawable(R.drawable.downtrend),
+                label = "Expenses",
+                amountPaise = totalExpensesPaise,
+                deltaPaise = expenseDeltaPaise,
+                currency = currency,
                 comparisonLabel = comparisonLabel,
                 isIncomeRow = false,
                 showChevron = showChevron,
@@ -113,9 +106,9 @@ fun FinancialSummaryCard(
 private fun MetricRow(
     leadingIcon: CashioIcon,
     label: String,
-    amount: Double,
-    delta: Double,
-    currencySymbol: String,
+    amountPaise: Long,
+    deltaPaise: Long,
+    currency: Currency,
     comparisonLabel: String,
     isIncomeRow: Boolean,
     showChevron: Boolean,
@@ -126,20 +119,34 @@ private fun MetricRow(
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
 
-    // Subtle press animation for better tactile feel
+    // Scale animation
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.985f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        targetValue = if (pressed) FinancialSummaryAnimations.PressScale
+        else FinancialSummaryAnimations.NormalScale,
+        animationSpec = FinancialSummaryAnimations.SpringSpec,
         label = "MetricRowScale"
     )
 
-    val rowTint = if (isIncomeRow) CashioSemantic.IncomeGreen else CashioSemantic.ExpenseRed
-
-    val amountText = remember(amount, currencySymbol) {
-        "$currencySymbol${CashioFormat.compactAmount(amount)}"
+    // Consolidate all display state into a single remembered object
+    val displayState = remember(
+        amountPaise,
+        deltaPaise,
+        currency,
+        comparisonLabel,
+        isIncomeRow
+    ) {
+        MetricDisplayState.from(
+            amountPaise = amountPaise,
+            deltaPaise = deltaPaise,
+            currency = currency,
+            comparisonLabel = comparisonLabel,
+            isIncomeRow = isIncomeRow
+        )
     }
-    val deltaText = remember(delta, currencySymbol, comparisonLabel) {
-        buildDeltaText(delta, currencySymbol, comparisonLabel)
+
+    // Accessibility
+    val semanticDesc = remember(label, displayState.amountText, displayState.deltaText) {
+        "$label: ${displayState.amountText}, ${displayState.deltaText}"
     }
 
     Row(
@@ -149,30 +156,32 @@ private fun MetricRow(
             .clip(RoundedCornerShape(CashioRadius.small))
             .clickable(
                 interactionSource = interactionSource,
-                indication = null, // Custom ripple handled by parent if needed, or disable for cleaner look
+                indication = null,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onClick()
                 }
             )
-            .padding(vertical = CashioSpacing.small),
+            .padding(vertical = CashioSpacing.xs)
+            .semantics { contentDescription = semanticDesc },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Icon Bubble
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(rowTint.copy(alpha = 0.12f)),
+                    .background(displayState.rowTint.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 CashioIcon(
                     icon = leadingIcon,
-                    tint = rowTint,
+                    tint = displayState.rowTint,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -184,41 +193,31 @@ private fun MetricRow(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // Animate text changes for delta
+                // Delta with animation
                 AnimatedContent(
-                    targetState = deltaText,
+                    targetState = displayState.deltaText,
                     transitionSpec = {
-                        (slideInVertically { it } + fadeIn()).togetherWith(
-                            slideOutVertically { -it } + fadeOut()
-                        )
+                        (slideInVertically { it } + fadeIn())
+                            .togetherWith(slideOutVertically { -it } + fadeOut())
                     },
                     label = "MetricRowDelta"
                 ) { targetText ->
-                    val deltaColor = deltaColor(
-                        delta = delta,
-                        isIncomeRow = isIncomeRow,
-                        neutral = MaterialTheme.colorScheme.onSurfaceVariant,
-                        income = CashioSemantic.IncomeGreen,
-                        expense = CashioSemantic.ExpenseRed
-                    )
-
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.tiny)
+                        horizontalArrangement = Arrangement.spacedBy(CashioSpacing.xxs)
                     ) {
-                        if (delta != 0.0) {
+                        displayState.deltaIcon?.let { icon ->
                             Icon(
-                                imageVector = if (delta > 0) Icons.Default.NorthEast else Icons.Default.SouthWest,
+                                imageVector = icon,
                                 contentDescription = null,
-                                tint = deltaColor,
+                                tint = displayState.deltaColor,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
-
                         Text(
                             text = targetText,
                             style = MaterialTheme.typography.bodySmall,
-                            color = deltaColor,
+                            color = displayState.deltaColor,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -227,16 +226,15 @@ private fun MetricRow(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(CashioSpacing.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Animate text changes for amount
+            // Amount with animation
             AnimatedContent(
-                targetState = amountText,
+                targetState = displayState.amountText,
                 transitionSpec = {
-                    (slideInVertically { it } + fadeIn()).togetherWith(
-                        slideOutVertically { -it } + fadeOut()
-                    )
+                    (slideInVertically { it } + fadeIn())
+                        .togetherWith(slideOutVertically { -it } + fadeOut())
                 },
                 label = "MetricRowAmount"
             ) { targetText ->
@@ -251,7 +249,7 @@ private fun MetricRow(
             if (showChevron) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
+                    contentDescription = "View details",
                     tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(20.dp)
                 )
@@ -260,33 +258,65 @@ private fun MetricRow(
     }
 }
 
-/**
- * Builds a readable string describing the change (e.g., "$500 less than last month").
- */
-private fun buildDeltaText(delta: Double, currencySymbol: String, comparisonLabel: String): String {
-    if (delta == 0.0) return "Same as $comparisonLabel"
-    val amount = "$currencySymbol${CashioFormat.compactAmount(abs(delta))}"
-    return if (delta > 0) "$amount more than $comparisonLabel" else "$amount less than $comparisonLabel"
-}
+// Immutable state holder - all display logic in one place
+@androidx.compose.runtime.Immutable
+private data class MetricDisplayState(
+    val amountText: String,
+    val deltaText: String,
+    val deltaColor: Color,
+    val deltaIcon: ImageVector?,
+    val rowTint: Color
+) {
+    companion object {
+        fun from(
+            amountPaise: Long,
+            deltaPaise: Long,
+            currency: Currency,
+            comparisonLabel: String,
+            isIncomeRow: Boolean
+        ): MetricDisplayState {
+            val amountText = CashioFormat.compactAmount(amountPaise, currency)
 
-/**
- * Determines the color of the delta text based on context.
- * - Income increasing is good (Green).
- * - Expense increasing is bad (Red).
- */
-private fun deltaColor(
-    delta: Double,
-    isIncomeRow: Boolean,
-    neutral: Color,
-    income: Color,
-    expense: Color
-): Color = when {
-    delta > 0 -> if (isIncomeRow) income else expense
-    delta < 0 -> if (isIncomeRow) expense else income
-    else -> neutral
-}
+            val deltaText = when {
+                deltaPaise == 0L -> "Same as $comparisonLabel"
+                else -> {
+                    val amount = CashioFormat.compactAmount(abs(deltaPaise), currency)
+                    val direction = if (deltaPaise > 0L) "more" else "less"
+                    "$amount $direction than $comparisonLabel"
+                }
+            }
 
-private const val LABEL_INCOME = "Income"
-private const val LABEL_EXPENSE = "Expense"
-private val ICON_INCOME = CashioIcon.Drawable(R.drawable.uptrend)
-private val ICON_EXPENSE = CashioIcon.Drawable(R.drawable.downtrend)
+            // Calculate delta color based on context
+            val deltaColor = when {
+                deltaPaise == 0L -> Color.Unspecified // Will use onSurfaceVariant
+                deltaPaise > 0L -> if (isIncomeRow)
+                    CashioSemantic.IncomeGreen
+                else
+                    CashioSemantic.ExpenseRed
+                else -> if (isIncomeRow)
+                    CashioSemantic.ExpenseRed
+                else
+                    CashioSemantic.IncomeGreen
+            }
+
+            val deltaIcon = when {
+                deltaPaise == 0L -> null
+                deltaPaise > 0L -> Icons.Default.NorthEast
+                else -> Icons.Default.SouthWest
+            }
+
+            val rowTint = if (isIncomeRow)
+                CashioSemantic.IncomeGreen
+            else
+                CashioSemantic.ExpenseRed
+
+            return MetricDisplayState(
+                amountText = amountText,
+                deltaText = deltaText,
+                deltaColor = deltaColor,
+                deltaIcon = deltaIcon,
+                rowTint = rowTint
+            )
+        }
+    }
+}

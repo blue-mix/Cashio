@@ -5,48 +5,38 @@ import com.bluemix.cashio.domain.model.Category
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Repository interface for Category operations
+ * Contract for category persistence operations.
+ *
+ * All suspend functions are safe to call from any coroutine context —
+ * implementations manage their own threading internally.
  */
 interface CategoryRepository {
-    suspend fun seedDefaults(): Result<Boolean>
 
-    /**
-     * Observe all categories as Flow
-     */
+    /** Reactive stream of all categories, ordered by display sort order. */
     fun observeCategories(): Flow<List<Category>>
 
-    /**
-     * Get all categories (one-time)
-     */
+    /** One-shot fetch of all categories. */
     suspend fun getAllCategories(): Result<List<Category>>
 
-    /**
-     * Get category by ID
-     */
+    /** Fetch a single category by [id], or `null` if it does not exist. */
     suspend fun getCategoryById(id: String): Result<Category?>
 
-    /**
-     * Get default categories
-     */
-    suspend fun getDefaultCategories(): Result<List<Category>>
-
-    /**
-     * Add new category
-     */
+    /** Persist a new category. Fails if [category.id] already exists. */
     suspend fun addCategory(category: Category): Result<Unit>
 
-    /**
-     * Update existing category
-     */
+    /** Update all mutable fields of an existing category. */
     suspend fun updateCategory(category: Category): Result<Unit>
 
     /**
-     * Delete category
+     * Delete a category by [categoryId].
+     *
+     * If [forceDelete] is `false` (default) and the category has associated
+     * expenses, returns [Result.Error] with [IllegalStateException].
+     * If [forceDelete] is `true`, expenses referencing the category are
+     * reassigned to the "other" fallback before deletion.
      */
-    suspend fun deleteCategory(categoryId: String): Result<Unit>
+    suspend fun deleteCategory(categoryId: String, forceDelete: Boolean = false): Result<Unit>
 
-    /**
-     * Check if category is in use by any expense
-     */
+    /** Returns `true` if any expense references [categoryId]. */
     suspend fun isCategoryInUse(categoryId: String): Result<Boolean>
 }

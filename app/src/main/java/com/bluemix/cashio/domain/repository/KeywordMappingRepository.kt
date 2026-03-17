@@ -5,53 +5,46 @@ import com.bluemix.cashio.domain.model.KeywordMapping
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Repository interface for KeywordMapping operations
+ * Contract for keyword mapping persistence operations.
+ *
+ * Keyword mappings drive auto-categorisation of SMS and notification transactions.
+ * Higher [KeywordMapping.priority] rules are evaluated first.
  */
 interface KeywordMappingRepository {
-    suspend fun seedDefaults(): Result<Boolean>
 
-    /**
-     * Observe all keyword mappings as Flow
-     */
+    /** Live stream of all keyword mappings, highest priority first. */
     fun observeKeywordMappings(): Flow<List<KeywordMapping>>
 
-    /**
-     * Get all keyword mappings (one-time)
-     */
+    /** All keyword mappings, highest priority first. */
     suspend fun getAllKeywordMappings(): Result<List<KeywordMapping>>
 
-    /**
-     * Get keyword mapping by ID
-     */
+    /** Single mapping by [id], or `null` if not found. */
     suspend fun getKeywordMappingById(id: String): Result<KeywordMapping?>
 
-    /**
-     * Get keyword mappings for a category
-     */
+    /** All mappings targeting [categoryId], highest priority first. */
     suspend fun getKeywordMappingsByCategory(categoryId: String): Result<List<KeywordMapping>>
 
     /**
-     * Find category for a merchant name using keyword matching
+     * Finds the best-matching category ID for [merchantName] by scanning
+     * all keyword mappings in priority order.
+     *
+     * Returns `null` if no rule matches — callers should fall back to "other".
+     *
+     * NOTE: Loads all mappings on every call. For bulk import operations,
+     * load mappings once via [getAllKeywordMappings] and perform matching
+     * in the caller to avoid repeated full-table reads.
      */
     suspend fun findCategoryForMerchant(merchantName: String): Result<String?>
 
-    /**
-     * Add new keyword mapping
-     */
+    /** Persist a new keyword mapping. */
     suspend fun addKeywordMapping(mapping: KeywordMapping): Result<Unit>
 
-    /**
-     * Update existing keyword mapping
-     */
+    /** Update keyword, category, and priority of an existing mapping. */
     suspend fun updateKeywordMapping(mapping: KeywordMapping): Result<Unit>
 
-    /**
-     * Delete keyword mapping
-     */
+    /** Delete a single mapping by [mappingId]. */
     suspend fun deleteKeywordMapping(mappingId: String): Result<Unit>
 
-    /**
-     * Delete all mappings for a category
-     */
+    /** Delete all mappings targeting [categoryId] (used before category deletion). */
     suspend fun deleteKeywordMappingsByCategory(categoryId: String): Result<Unit>
 }

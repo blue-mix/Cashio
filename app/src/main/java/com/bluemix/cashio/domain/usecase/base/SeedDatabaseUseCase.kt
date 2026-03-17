@@ -1,26 +1,18 @@
 package com.bluemix.cashio.domain.usecase.base
 
 import com.bluemix.cashio.core.common.Result
-import com.bluemix.cashio.domain.repository.CategoryRepository
-import com.bluemix.cashio.domain.repository.KeywordMappingRepository
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import com.bluemix.cashio.domain.repository.SeedRepository
 
+/**
+ * Seeds default categories and keyword mappings on first launch.
+ *
+ * Returns [Result.Success] with `true` if data was written, `false` if already seeded.
+ * Returns [Result.Error] with the original exception if seeding fails — the caller
+ * must handle this and must NOT mark onboarding as complete until this succeeds.
+ */
 class SeedDatabaseUseCase(
-    private val categoryRepository: CategoryRepository,
-    private val keywordMappingRepository: KeywordMappingRepository
-) {
-    suspend operator fun invoke(): Result<Unit> = coroutineScope {
-        val catJob = async { categoryRepository.seedDefaults() }
-        val kwJob = async { keywordMappingRepository.seedDefaults() }
+    private val seedRepository: SeedRepository
+) : NoParamsUseCase<Boolean>() {
 
-        val catRes = catJob.await()
-        val kwRes = kwJob.await()
-
-        when {
-            catRes is Result.Error -> catRes
-            kwRes is Result.Error -> kwRes
-            else -> Result.Success(Unit)
-        }
-    }
+    override suspend fun execute(): Result<Boolean> = seedRepository.seedIfNeeded()
 }

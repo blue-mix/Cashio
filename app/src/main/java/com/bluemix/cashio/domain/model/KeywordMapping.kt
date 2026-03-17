@@ -1,301 +1,306 @@
 package com.bluemix.cashio.domain.model
 
 /**
- * Domain model for keyword to category mapping
- * Used for auto-categorizing expenses from SMS
+ * Domain model for a keyword-to-category mapping used for auto-categorising expenses.
+ *
+ * [keyword] matching is case-insensitive substring matching performed at the use-site
+ * (see [KeywordMappingRepository.findCategoryForMerchant]).
+ * Higher [priority] values are evaluated first; ties are broken by insertion order.
  */
 data class KeywordMapping(
     val id: String,
     val keyword: String,
     val categoryId: String,
-    val priority: Int = 0  // Higher priority = checked first
+    val priority: Int = 5   // 1-10 scale; default mid-range
 ) {
     companion object {
-        // Default keyword mappings for common merchants
-        fun getDefaultKeywordMappings(): List<KeywordMapping> = listOf(
-            // Groceries
-            KeywordMapping("kw_g1", "bigbasket", "groceries", 10),
-            KeywordMapping("kw_g2", "blinkit", "groceries", 10),
-            KeywordMapping("kw_g3", "zepto", "groceries", 10),
-            KeywordMapping("kw_g4", "instamart", "groceries", 10),
-            KeywordMapping("kw_g5", "dmart", "groceries", 10),
-            KeywordMapping("kw_g6", "reliance fresh", "groceries", 10),
-            KeywordMapping("kw_g7", "more megastore", "groceries", 10),
-            KeywordMapping("kw_g8", "star bazaar", "groceries", 10),
-            KeywordMapping("kw_g9", "spencer", "groceries", 10),
-            KeywordMapping("kw_g10", "grocery", "groceries", 5),
-            KeywordMapping("kw_g11", "supermarket", "groceries", 5),
 
-            // Dining Out
-            KeywordMapping("kw_d1", "swiggy", "dining_out", 10),
-            KeywordMapping("kw_d2", "zomato", "dining_out", 10),
-            KeywordMapping("kw_d3", "dominos", "dining_out", 10),
-            KeywordMapping("kw_d4", "mcdonald", "dining_out", 10),
-            KeywordMapping("kw_d5", "kfc", "dining_out", 10),
-            KeywordMapping("kw_d6", "burger king", "dining_out", 10),
-            KeywordMapping("kw_d7", "pizza hut", "dining_out", 10),
-            KeywordMapping("kw_d8", "subway", "dining_out", 10),
-            KeywordMapping("kw_d9", "restaurant", "dining_out", 5),
-            KeywordMapping("kw_d10", "food delivery", "dining_out", 5),
-            KeywordMapping("kw_d11", "hotel", "dining_out", 3),
-            KeywordMapping("kw_d12", "dine", "dining_out", 3),
+        /**
+         * Lazily-initialised default rules.
+         *
+         * ID scheme: "kw_<categoryId>_<descriptor>" — stable, human-readable,
+         * immune to re-ordering unlike sequential numeric suffixes.
+         *
+         * Priority guide:
+         *  10 — exact brand / app name (highest confidence)
+         *   8 — strong generic keyword
+         *   5 — medium generic (may match broadly)
+         *   3 — weak/ambiguous (use sparingly)
+         */
+        val DEFAULT_KEYWORD_MAPPINGS: List<KeywordMapping> by lazy {
+            listOf(
+                // ── Groceries ─────────────────────────────────────────────
+                KeywordMapping("kw_groceries_bigbasket", "bigbasket", "groceries", 10),
+                KeywordMapping("kw_groceries_blinkit", "blinkit", "groceries", 10),
+                KeywordMapping("kw_groceries_zepto", "zepto", "groceries", 10),
+                KeywordMapping("kw_groceries_instamart", "instamart", "groceries", 10),
+                KeywordMapping("kw_groceries_dmart", "dmart", "groceries", 10),
+                KeywordMapping("kw_groceries_reliancefresh", "reliance fresh", "groceries", 10),
+                KeywordMapping("kw_groceries_more", "more megastore", "groceries", 10),
+                KeywordMapping("kw_groceries_starbazaar", "star bazaar", "groceries", 10),
+                KeywordMapping("kw_groceries_spencer", "spencer", "groceries", 10),
+                KeywordMapping("kw_groceries_generic", "grocery", "groceries", 5),
+                KeywordMapping("kw_groceries_supermarket", "supermarket", "groceries", 5),
 
-            // Coffee & Snacks
-            KeywordMapping("kw_c1", "starbucks", "coffee_snacks", 10),
-            KeywordMapping("kw_c2", "cafe coffee day", "coffee_snacks", 10),
-            KeywordMapping("kw_c3", "ccd", "coffee_snacks", 10),
-            KeywordMapping("kw_c4", "dunkin", "coffee_snacks", 10),
-            KeywordMapping("kw_c5", "cafe", "coffee_snacks", 5),
-            KeywordMapping("kw_c6", "bakery", "coffee_snacks", 5),
+                // ── Dining Out ────────────────────────────────────────────
+                KeywordMapping("kw_dining_swiggy", "swiggy", "dining_out", 10),
+                KeywordMapping("kw_dining_zomato", "zomato", "dining_out", 10),
+                KeywordMapping("kw_dining_dominos", "dominos", "dining_out", 10),
+                KeywordMapping("kw_dining_mcdonalds", "mcdonald", "dining_out", 10),
+                KeywordMapping("kw_dining_kfc", "kfc", "dining_out", 10),
+                KeywordMapping("kw_dining_burgerking", "burger king", "dining_out", 10),
+                KeywordMapping("kw_dining_pizzahut", "pizza hut", "dining_out", 10),
+                KeywordMapping("kw_dining_subway", "subway", "dining_out", 10),
+                KeywordMapping("kw_dining_restaurant", "restaurant", "dining_out", 5),
+                KeywordMapping("kw_dining_fooddelivery", "food delivery", "dining_out", 5),
 
-            // Fuel
-            KeywordMapping("kw_f1", "petrol pump", "fuel", 10),
-            KeywordMapping("kw_f2", "indian oil", "fuel", 10),
-            KeywordMapping("kw_f3", "bharat petroleum", "fuel", 10),
-            KeywordMapping("kw_f4", "hp petrol", "fuel", 10),
-            KeywordMapping("kw_f5", "shell", "fuel", 10),
-            KeywordMapping("kw_f6", "petrol", "fuel", 8),
-            KeywordMapping("kw_f7", "diesel", "fuel", 8),
-            KeywordMapping("kw_f8", "fuel", "fuel", 8),
-            KeywordMapping("kw_f9", "cng", "fuel", 8),
+                // ── Coffee & Snacks ───────────────────────────────────────
+                KeywordMapping("kw_coffee_starbucks", "starbucks", "coffee_snacks", 10),
+                KeywordMapping("kw_coffee_ccd", "cafe coffee day", "coffee_snacks", 10),
+                KeywordMapping("kw_coffee_ccd2", "ccd", "coffee_snacks", 10),
+                KeywordMapping("kw_coffee_dunkin", "dunkin", "coffee_snacks", 10),
+                KeywordMapping("kw_coffee_cafe", "cafe", "coffee_snacks", 5),
+                KeywordMapping("kw_coffee_bakery", "bakery", "coffee_snacks", 5),
 
-            // Public Transport
-            KeywordMapping("kw_pt1", "metro", "public_transport", 10),
-            KeywordMapping("kw_pt2", "dmrc", "public_transport", 10),
-            KeywordMapping("kw_pt3", "railway", "public_transport", 10),
-            KeywordMapping("kw_pt4", "irctc", "public_transport", 10),
-            KeywordMapping("kw_pt5", "bus ticket", "public_transport", 10),
-            KeywordMapping("kw_pt6", "local train", "public_transport", 8),
-            KeywordMapping("kw_pt7", "transport", "public_transport", 3),
+                // ── Fuel ──────────────────────────────────────────────────
+                KeywordMapping("kw_fuel_petrolpump", "petrol pump", "fuel", 10),
+                KeywordMapping("kw_fuel_indianoil", "indian oil", "fuel", 10),
+                KeywordMapping("kw_fuel_bharatpetroleum", "bharat petroleum", "fuel", 10),
+                KeywordMapping("kw_fuel_hp", "hp petrol", "fuel", 10),
+                KeywordMapping("kw_fuel_shell", "shell", "fuel", 10),
+                KeywordMapping("kw_fuel_petrol", "petrol", "fuel", 8),
+                KeywordMapping("kw_fuel_diesel", "diesel", "fuel", 8),
+                KeywordMapping("kw_fuel_cng", "cng", "fuel", 8),
 
-            // Taxi & Ride Share
-            KeywordMapping("kw_t1", "uber", "taxi_ride_share", 10),
-            KeywordMapping("kw_t2", "ola", "taxi_ride_share", 10),
-            KeywordMapping("kw_t3", "rapido", "taxi_ride_share", 10),
-            KeywordMapping("kw_t4", "namma yatri", "taxi_ride_share", 10),
-            KeywordMapping("kw_t5", "meru", "taxi_ride_share", 10),
-            KeywordMapping("kw_t6", "taxi", "taxi_ride_share", 5),
-            KeywordMapping("kw_t7", "cab", "taxi_ride_share", 5),
+                // ── Public Transport ──────────────────────────────────────
+                KeywordMapping("kw_transport_metro", "metro", "public_transport", 10),
+                KeywordMapping("kw_transport_dmrc", "dmrc", "public_transport", 10),
+                KeywordMapping("kw_transport_railway", "railway", "public_transport", 10),
+                KeywordMapping("kw_transport_irctc", "irctc", "public_transport", 10),
+                KeywordMapping("kw_transport_busticket", "bus ticket", "public_transport", 10),
+                KeywordMapping("kw_transport_localtrain", "local train", "public_transport", 8),
 
-            // Parking & Tolls
-            KeywordMapping("kw_p1", "fastag", "parking", 10),
-            KeywordMapping("kw_p2", "toll", "parking", 10),
-            KeywordMapping("kw_p3", "parking", "parking", 10),
-            KeywordMapping("kw_p4", "park+", "parking", 10),
+                // ── Taxi & Ride Share ─────────────────────────────────────
+                KeywordMapping("kw_taxi_uber", "uber", "taxi_ride_share", 10),
+                KeywordMapping("kw_taxi_ola", "ola", "taxi_ride_share", 10),
+                KeywordMapping("kw_taxi_rapido", "rapido", "taxi_ride_share", 10),
+                KeywordMapping("kw_taxi_nammayatri", "namma yatri", "taxi_ride_share", 10),
+                KeywordMapping("kw_taxi_meru", "meru", "taxi_ride_share", 10),
+                KeywordMapping("kw_taxi_generic", "taxi", "taxi_ride_share", 5),
+                KeywordMapping("kw_taxi_cab", "cab", "taxi_ride_share", 5),
 
-            // Vehicle Maintenance
-            KeywordMapping("kw_vm1", "service center", "vehicle_maintenance", 10),
-            KeywordMapping("kw_vm2", "car wash", "vehicle_maintenance", 10),
-            KeywordMapping("kw_vm3", "auto repair", "vehicle_maintenance", 10),
-            KeywordMapping("kw_vm4", "tyre", "vehicle_maintenance", 8),
-            KeywordMapping("kw_vm5", "battery", "vehicle_maintenance", 8),
+                // ── Parking & Tolls ───────────────────────────────────────
+                KeywordMapping("kw_parking_fastag", "fastag", "parking", 10),
+                KeywordMapping("kw_parking_toll", "toll", "parking", 10),
+                KeywordMapping("kw_parking_generic", "parking", "parking", 10),
+                KeywordMapping("kw_parking_parkplus", "park+", "parking", 10),
 
-            // Rent/Mortgage
-            KeywordMapping("kw_r1", "rent", "rent_mortgage", 10),
-            KeywordMapping("kw_r2", "housing society", "rent_mortgage", 10),
-            KeywordMapping("kw_r3", "maintenance", "rent_mortgage", 5),
+                // ── Vehicle Maintenance ───────────────────────────────────
+                KeywordMapping(
+                    "kw_vehicle_servicecenter",
+                    "service center",
+                    "vehicle_maintenance",
+                    10
+                ),
+                KeywordMapping("kw_vehicle_carwash", "car wash", "vehicle_maintenance", 10),
+                KeywordMapping("kw_vehicle_autorepair", "auto repair", "vehicle_maintenance", 10),
+                KeywordMapping("kw_vehicle_tyre", "tyre", "vehicle_maintenance", 8),
+                KeywordMapping("kw_vehicle_battery", "battery", "vehicle_maintenance", 8),
 
-            // Electricity
-            KeywordMapping("kw_e1", "electricity", "electricity", 10),
-            KeywordMapping("kw_e2", "power", "electricity", 8),
-            KeywordMapping("kw_e3", "adani electricity", "electricity", 10),
-            KeywordMapping("kw_e4", "tata power", "electricity", 10),
-            KeywordMapping("kw_e5", "bescom", "electricity", 10),
+                // ── Rent / Mortgage ───────────────────────────────────────
+                KeywordMapping("kw_rent_generic", "rent", "rent_mortgage", 10),
+                KeywordMapping("kw_rent_housingsociety", "housing society", "rent_mortgage", 10),
 
-            // Water
-            KeywordMapping("kw_w1", "water", "water", 10),
-            KeywordMapping("kw_w2", "municipal", "water", 5),
+                // ── Electricity ───────────────────────────────────────────
+                KeywordMapping("kw_electricity_generic", "electricity", "electricity", 10),
+                KeywordMapping("kw_electricity_adani", "adani electricity", "electricity", 10),
+                KeywordMapping("kw_electricity_tata", "tata power", "electricity", 10),
+                KeywordMapping("kw_electricity_bescom", "bescom", "electricity", 10),
 
-            // Internet & Phone
-            KeywordMapping("kw_i1", "airtel", "internet_phone", 10),
-            KeywordMapping("kw_i2", "jio", "internet_phone", 10),
-            KeywordMapping("kw_i3", "vi", "internet_phone", 10),
-            KeywordMapping("kw_i4", "vodafone", "internet_phone", 10),
-            KeywordMapping("kw_i5", "bsnl", "internet_phone", 10),
-            KeywordMapping("kw_i6", "broadband", "internet_phone", 10),
-            KeywordMapping("kw_i7", "internet", "internet_phone", 8),
-            KeywordMapping("kw_i8", "mobile recharge", "internet_phone", 8),
-            KeywordMapping("kw_i9", "recharge", "internet_phone", 5),
-            KeywordMapping("kw_i10", "postpaid", "internet_phone", 8),
-            KeywordMapping("kw_i11", "prepaid", "internet_phone", 8),
+                // ── Water ─────────────────────────────────────────────────
+                KeywordMapping("kw_water_generic", "water bill", "water", 10),
+                KeywordMapping("kw_water_municipal", "municipal", "water", 5),
 
-            // Home Maintenance
-            KeywordMapping("kw_hm1", "plumber", "home_maintenance", 10),
-            KeywordMapping("kw_hm2", "electrician", "home_maintenance", 10),
-            KeywordMapping("kw_hm3", "carpenter", "home_maintenance", 10),
-            KeywordMapping("kw_hm4", "urban company", "home_maintenance", 10),
+                // ── Internet & Phone ──────────────────────────────────────
+                KeywordMapping("kw_internet_airtel", "airtel", "internet_phone", 10),
+                KeywordMapping("kw_internet_jio", "jio", "internet_phone", 10),
+                KeywordMapping("kw_internet_vodafoneidea", "vodafone idea", "internet_phone", 10),
+                KeywordMapping("kw_internet_bsnl", "bsnl", "internet_phone", 10),
+                KeywordMapping("kw_internet_broadband", "broadband", "internet_phone", 10),
+                KeywordMapping(
+                    "kw_internet_mobilerecharge",
+                    "mobile recharge",
+                    "internet_phone",
+                    8
+                ),
+                KeywordMapping("kw_internet_postpaid", "postpaid", "internet_phone", 8),
+                KeywordMapping("kw_internet_prepaid", "prepaid", "internet_phone", 8),
 
-            // Clothing & Accessories
-            KeywordMapping("kw_cl1", "myntra", "clothing", 10),
-            KeywordMapping("kw_cl2", "ajio", "clothing", 10),
-            KeywordMapping("kw_cl3", "h&m", "clothing", 10),
-            KeywordMapping("kw_cl4", "zara", "clothing", 10),
-            KeywordMapping("kw_cl5", "lifestyle", "clothing", 10),
-            KeywordMapping("kw_cl6", "pantaloons", "clothing", 10),
-            KeywordMapping("kw_cl7", "westside", "clothing", 10),
-            KeywordMapping("kw_cl8", "max fashion", "clothing", 10),
-            KeywordMapping("kw_cl9", "clothing", "clothing", 5),
-            KeywordMapping("kw_cl10", "apparel", "clothing", 5),
+                // ── Home Maintenance ──────────────────────────────────────
+                KeywordMapping("kw_home_plumber", "plumber", "home_maintenance", 10),
+                KeywordMapping("kw_home_electrician", "electrician", "home_maintenance", 10),
+                KeywordMapping("kw_home_carpenter", "carpenter", "home_maintenance", 10),
+                KeywordMapping("kw_home_urbancompany", "urban company", "home_maintenance", 10),
 
-            // Electronics
-            KeywordMapping("kw_el1", "croma", "electronics", 10),
-            KeywordMapping("kw_el2", "reliance digital", "electronics", 10),
-            KeywordMapping("kw_el3", "vijay sales", "electronics", 10),
-            KeywordMapping("kw_el4", "apple store", "electronics", 10),
-            KeywordMapping("kw_el5", "samsung", "electronics", 8),
-            KeywordMapping("kw_el6", "oneplus", "electronics", 8),
-            KeywordMapping("kw_el7", "electronics", "electronics", 5),
+                // ── Clothing & Accessories ────────────────────────────────
+                KeywordMapping("kw_clothing_myntra", "myntra", "clothing", 10),
+                KeywordMapping("kw_clothing_ajio", "ajio", "clothing", 10),
+                KeywordMapping("kw_clothing_hm", "h&m", "clothing", 10),
+                KeywordMapping("kw_clothing_zara", "zara", "clothing", 10),
+                KeywordMapping("kw_clothing_lifestyle", "lifestyle", "clothing", 10),
+                KeywordMapping("kw_clothing_pantaloons", "pantaloons", "clothing", 10),
+                KeywordMapping("kw_clothing_westside", "westside", "clothing", 10),
+                KeywordMapping("kw_clothing_maxfashion", "max fashion", "clothing", 10),
+                KeywordMapping("kw_clothing_generic", "clothing", "clothing", 5),
 
-            // Shopping (General)
-            KeywordMapping("kw_sh1", "amazon", "home_goods", 10),
-            KeywordMapping("kw_sh2", "flipkart", "home_goods", 10),
-            KeywordMapping("kw_sh3", "meesho", "home_goods", 10),
-            KeywordMapping("kw_sh4", "snapdeal", "home_goods", 10),
-            KeywordMapping("kw_sh5", "shopclues", "home_goods", 10),
+                // ── Electronics ───────────────────────────────────────────
+                KeywordMapping("kw_electronics_croma", "croma", "electronics", 10),
+                KeywordMapping(
+                    "kw_electronics_reliancedigital",
+                    "reliance digital",
+                    "electronics",
+                    10
+                ),
+                KeywordMapping("kw_electronics_vijaysales", "vijay sales", "electronics", 10),
+                KeywordMapping("kw_electronics_apple", "apple store", "electronics", 10),
+                KeywordMapping("kw_electronics_samsung", "samsung store", "electronics", 8),
+                KeywordMapping("kw_electronics_generic", "electronics", "electronics", 5),
 
-            // Personal Care
-            KeywordMapping("kw_pc1", "nykaa", "personal_care", 10),
-            KeywordMapping("kw_pc2", "purplle", "personal_care", 10),
-            KeywordMapping("kw_pc3", "salon", "personal_care", 10),
-            KeywordMapping("kw_pc4", "spa", "personal_care", 10),
-            KeywordMapping("kw_pc5", "cosmetics", "personal_care", 8),
+                // ── Personal Care ─────────────────────────────────────────
+                KeywordMapping("kw_care_nykaa", "nykaa", "personal_care", 10),
+                KeywordMapping("kw_care_purplle", "purplle", "personal_care", 10),
+                KeywordMapping("kw_care_salon", "salon", "personal_care", 10),
+                KeywordMapping("kw_care_spa", "spa", "personal_care", 10),
 
-            // Movies & Shows
-            KeywordMapping("kw_m1", "bookmyshow", "movies_shows", 10),
-            KeywordMapping("kw_m2", "pvr", "movies_shows", 10),
-            KeywordMapping("kw_m3", "inox", "movies_shows", 10),
-            KeywordMapping("kw_m4", "cinepolis", "movies_shows", 10),
-            KeywordMapping("kw_m5", "movie ticket", "movies_shows", 10),
-            KeywordMapping("kw_m6", "cinema", "movies_shows", 8),
+                // ── Movies & Shows ────────────────────────────────────────
+                KeywordMapping("kw_movies_bookmyshow", "bookmyshow", "movies_shows", 10),
+                KeywordMapping("kw_movies_pvr", "pvr", "movies_shows", 10),
+                KeywordMapping("kw_movies_inox", "inox", "movies_shows", 10),
+                KeywordMapping("kw_movies_cinepolis", "cinepolis", "movies_shows", 10),
+                KeywordMapping("kw_movies_ticket", "movie ticket", "movies_shows", 10),
+                KeywordMapping("kw_movies_cinema", "cinema", "movies_shows", 8),
 
-            // Sports & Fitness
-            KeywordMapping("kw_sf1", "gym", "sports_fitness", 10),
-            KeywordMapping("kw_sf2", "cult fit", "sports_fitness", 10),
-            KeywordMapping("kw_sf3", "fitness first", "sports_fitness", 10),
-            KeywordMapping("kw_sf4", "gold's gym", "sports_fitness", 10),
-            KeywordMapping("kw_sf5", "decathlon", "sports_fitness", 10),
-            KeywordMapping("kw_sf6", "yoga", "sports_fitness", 8),
-            KeywordMapping("kw_sf7", "sports", "sports_fitness", 5),
+                // ── Sports & Fitness ──────────────────────────────────────
+                KeywordMapping("kw_fitness_gym", "gym", "sports_fitness", 10),
+                KeywordMapping("kw_fitness_cultfit", "cult fit", "sports_fitness", 10),
+                KeywordMapping("kw_fitness_fitnessfirst", "fitness first", "sports_fitness", 10),
+                KeywordMapping("kw_fitness_goldsgym", "gold's gym", "sports_fitness", 10),
+                KeywordMapping("kw_fitness_decathlon", "decathlon", "sports_fitness", 10),
+                KeywordMapping("kw_fitness_yoga", "yoga", "sports_fitness", 8),
 
-            // Gaming
-            KeywordMapping("kw_gm1", "steam", "gaming", 10),
-            KeywordMapping("kw_gm2", "playstation", "gaming", 10),
-            KeywordMapping("kw_gm3", "xbox", "gaming", 10),
-            KeywordMapping("kw_gm4", "google play", "gaming", 8),
-            KeywordMapping("kw_gm5", "app store", "gaming", 5),
+                // ── Gaming ────────────────────────────────────────────────
+                KeywordMapping("kw_gaming_steam", "steam", "gaming", 10),
+                KeywordMapping("kw_gaming_playstation", "playstation", "gaming", 10),
+                KeywordMapping("kw_gaming_xbox", "xbox", "gaming", 10),
+                KeywordMapping("kw_gaming_googleplay", "google play games", "gaming", 8),
 
-            // Subscriptions
-            KeywordMapping("kw_sub1", "netflix", "subscriptions", 10),
-            KeywordMapping("kw_sub2", "amazon prime", "subscriptions", 10),
-            KeywordMapping("kw_sub3", "hotstar", "subscriptions", 10),
-            KeywordMapping("kw_sub4", "disney+", "subscriptions", 10),
-            KeywordMapping("kw_sub5", "spotify", "subscriptions", 10),
-            KeywordMapping("kw_sub6", "youtube premium", "subscriptions", 10),
-            KeywordMapping("kw_sub7", "apple music", "subscriptions", 10),
-            KeywordMapping("kw_sub8", "zee5", "subscriptions", 10),
-            KeywordMapping("kw_sub9", "sonyliv", "subscriptions", 10),
-            KeywordMapping("kw_sub10", "subscription", "subscriptions", 5),
+                // ── Subscriptions ─────────────────────────────────────────
+                KeywordMapping("kw_sub_netflix", "netflix", "subscriptions", 10),
+                KeywordMapping("kw_sub_amazonprime", "amazon prime", "subscriptions", 10),
+                KeywordMapping("kw_sub_hotstar", "hotstar", "subscriptions", 10),
+                KeywordMapping("kw_sub_disneyplus", "disney+", "subscriptions", 10),
+                KeywordMapping("kw_sub_spotify", "spotify", "subscriptions", 10),
+                KeywordMapping("kw_sub_youtubepremium", "youtube premium", "subscriptions", 10),
+                KeywordMapping("kw_sub_applemusic", "apple music", "subscriptions", 10),
+                KeywordMapping("kw_sub_zee5", "zee5", "subscriptions", 10),
+                KeywordMapping("kw_sub_sonyliv", "sonyliv", "subscriptions", 10),
+                KeywordMapping("kw_sub_generic", "subscription", "subscriptions", 5),
 
-            // Medical & Doctor
-            KeywordMapping("kw_md1", "apollo", "medical", 10),
-            KeywordMapping("kw_md2", "fortis", "medical", 10),
-            KeywordMapping("kw_md3", "max hospital", "medical", 10),
-            KeywordMapping("kw_md4", "hospital", "medical", 8),
-            KeywordMapping("kw_md5", "doctor", "medical", 8),
-            KeywordMapping("kw_md6", "clinic", "medical", 8),
-            KeywordMapping("kw_md7", "practo", "medical", 10),
+                // ── Medical ───────────────────────────────────────────────
+                KeywordMapping("kw_medical_apollo", "apollo hospital", "medical", 10),
+                KeywordMapping("kw_medical_fortis", "fortis", "medical", 10),
+                KeywordMapping("kw_medical_max", "max hospital", "medical", 10),
+                KeywordMapping("kw_medical_hospital", "hospital", "medical", 8),
+                KeywordMapping("kw_medical_doctor", "doctor", "medical", 8),
+                KeywordMapping("kw_medical_clinic", "clinic", "medical", 8),
+                KeywordMapping("kw_medical_practo", "practo", "medical", 10),
 
-            // Pharmacy & Medicine
-            KeywordMapping("kw_ph1", "apollo pharmacy", "pharmacy", 10),
-            KeywordMapping("kw_ph2", "netmeds", "pharmacy", 10),
-            KeywordMapping("kw_ph3", "1mg", "pharmacy", 10),
-            KeywordMapping("kw_ph4", "pharmeasy", "pharmacy", 10),
-            KeywordMapping("kw_ph5", "medplus", "pharmacy", 10),
-            KeywordMapping("kw_ph6", "pharmacy", "pharmacy", 8),
-            KeywordMapping("kw_ph7", "medicine", "pharmacy", 8),
+                // ── Pharmacy ──────────────────────────────────────────────
+                KeywordMapping("kw_pharmacy_apollo", "apollo pharmacy", "pharmacy", 10),
+                KeywordMapping("kw_pharmacy_netmeds", "netmeds", "pharmacy", 10),
+                KeywordMapping("kw_pharmacy_1mg", "1mg", "pharmacy", 10),
+                KeywordMapping("kw_pharmacy_pharmeasy", "pharmeasy", "pharmacy", 10),
+                KeywordMapping("kw_pharmacy_medplus", "medplus", "pharmacy", 10),
+                KeywordMapping("kw_pharmacy_generic", "pharmacy", "pharmacy", 8),
+                KeywordMapping("kw_pharmacy_medicine", "medicine", "pharmacy", 8),
 
-            // Dental
-            KeywordMapping("kw_de1", "dental", "dental", 10),
-            KeywordMapping("kw_de2", "dentist", "dental", 10),
+                // ── Dental ────────────────────────────────────────────────
+                KeywordMapping("kw_dental_generic", "dental", "dental", 10),
+                KeywordMapping("kw_dental_dentist", "dentist", "dental", 10),
 
-            // Insurance
-            KeywordMapping("kw_in1", "lic", "insurance", 10),
-            KeywordMapping("kw_in2", "hdfc life", "insurance", 10),
-            KeywordMapping("kw_in3", "icici prudential", "insurance", 10),
-            KeywordMapping("kw_in4", "max life", "insurance", 10),
-            KeywordMapping("kw_in5", "insurance", "insurance", 8),
-            KeywordMapping("kw_in6", "premium", "insurance", 3),
+                // ── Insurance ─────────────────────────────────────────────
+                KeywordMapping("kw_insurance_lic", "lic", "insurance", 10),
+                KeywordMapping("kw_insurance_hdfclife", "hdfc life", "insurance", 10),
+                KeywordMapping("kw_insurance_icici", "icici prudential", "insurance", 10),
+                KeywordMapping("kw_insurance_maxlife", "max life", "insurance", 10),
+                KeywordMapping("kw_insurance_generic", "insurance", "insurance", 8),
 
-            // Tuition & Courses
-            KeywordMapping("kw_tu1", "byju", "tuition", 10),
-            KeywordMapping("kw_tu2", "unacademy", "tuition", 10),
-            KeywordMapping("kw_tu3", "upgrad", "tuition", 10),
-            KeywordMapping("kw_tu4", "coursera", "tuition", 10),
-            KeywordMapping("kw_tu5", "udemy", "tuition", 10),
-            KeywordMapping("kw_tu6", "tuition", "tuition", 8),
-            KeywordMapping("kw_tu7", "course", "tuition", 5),
+                // ── Tuition & Courses ─────────────────────────────────────
+                KeywordMapping("kw_tuition_byju", "byju", "tuition", 10),
+                KeywordMapping("kw_tuition_unacademy", "unacademy", "tuition", 10),
+                KeywordMapping("kw_tuition_upgrad", "upgrad", "tuition", 10),
+                KeywordMapping("kw_tuition_coursera", "coursera", "tuition", 10),
+                KeywordMapping("kw_tuition_udemy", "udemy", "tuition", 10),
+                KeywordMapping("kw_tuition_generic", "tuition", "tuition", 8),
 
-            // Learning Materials
-            KeywordMapping("kw_lm1", "amazon books", "learning_materials", 10),
-            KeywordMapping("kw_lm2", "flipkart books", "learning_materials", 10),
-            KeywordMapping("kw_lm3", "book", "learning_materials", 5),
-            KeywordMapping("kw_lm4", "stationery", "learning_materials", 8),
+                // ── Learning Materials ────────────────────────────────────
+                KeywordMapping("kw_learning_stationery", "stationery", "learning_materials", 8),
 
-            // Investments
-            KeywordMapping("kw_inv1", "zerodha", "investments", 10),
-            KeywordMapping("kw_inv2", "groww", "investments", 10),
-            KeywordMapping("kw_inv3", "upstox", "investments", 10),
-            KeywordMapping("kw_inv4", "mutual fund", "investments", 10),
-            KeywordMapping("kw_inv5", "sip", "investments", 10),
-            KeywordMapping("kw_inv6", "stock", "investments", 8),
+                // ── Investments ───────────────────────────────────────────
+                KeywordMapping("kw_invest_zerodha", "zerodha", "investments", 10),
+                KeywordMapping("kw_invest_groww", "groww", "investments", 10),
+                KeywordMapping("kw_invest_upstox", "upstox", "investments", 10),
+                KeywordMapping("kw_invest_mutualfund", "mutual fund", "investments", 10),
+                KeywordMapping("kw_invest_sip", "sip", "investments", 10),
 
-            // Loan Payment
-            KeywordMapping("kw_lp1", "emi", "loan_payment", 10),
-            KeywordMapping("kw_lp2", "loan", "loan_payment", 8),
-            KeywordMapping("kw_lp3", "credit card bill", "loan_payment", 10),
+                // ── Loan Payment ──────────────────────────────────────────
+                KeywordMapping("kw_loan_emi", "emi", "loan_payment", 10),
+                KeywordMapping("kw_loan_generic", "loan repayment", "loan_payment", 8),
+                KeywordMapping("kw_loan_creditcardbill", "credit card bill", "loan_payment", 10),
 
-            // Taxes
-            KeywordMapping("kw_tx1", "income tax", "taxes", 10),
-            KeywordMapping("kw_tx2", "gst", "taxes", 10),
-            KeywordMapping("kw_tx3", "tax", "taxes", 8),
+                // ── Taxes ─────────────────────────────────────────────────
+                KeywordMapping("kw_tax_incometax", "income tax", "taxes", 10),
+                KeywordMapping("kw_tax_gst", "gst payment", "taxes", 10),
 
-            // Childcare
-            KeywordMapping("kw_ch1", "school fee", "childcare", 10),
-            KeywordMapping("kw_ch2", "daycare", "childcare", 10),
-            KeywordMapping("kw_ch3", "toys", "childcare", 5),
+                // ── Childcare ─────────────────────────────────────────────
+                KeywordMapping("kw_childcare_schoolfee", "school fee", "childcare", 10),
+                KeywordMapping("kw_childcare_daycare", "daycare", "childcare", 10),
 
-            // Pets
-            KeywordMapping("kw_pet1", "pet shop", "pets", 10),
-            KeywordMapping("kw_pet2", "veterinary", "pets", 10),
-            KeywordMapping("kw_pet3", "pet food", "pets", 10),
+                // ── Pets ──────────────────────────────────────────────────
+                KeywordMapping("kw_pets_petshop", "pet shop", "pets", 10),
+                KeywordMapping("kw_pets_veterinary", "veterinary", "pets", 10),
+                KeywordMapping("kw_pets_petfood", "pet food", "pets", 10),
 
-            // Vacation & Travel
-            KeywordMapping("kw_vt1", "makemytrip", "vacation", 10),
-            KeywordMapping("kw_vt2", "goibibo", "vacation", 10),
-            KeywordMapping("kw_vt3", "cleartrip", "vacation", 10),
-            KeywordMapping("kw_vt4", "yatra", "vacation", 10),
-            KeywordMapping("kw_vt5", "flight", "vacation", 8),
-            KeywordMapping("kw_vt6", "airline", "vacation", 8),
-            KeywordMapping("kw_vt7", "indigo", "vacation", 10),
-            KeywordMapping("kw_vt8", "air india", "vacation", 10),
-            KeywordMapping("kw_vt9", "spicejet", "vacation", 10),
+                // ── Vacation & Travel ─────────────────────────────────────
+                KeywordMapping("kw_travel_makemytrip", "makemytrip", "vacation", 10),
+                KeywordMapping("kw_travel_goibibo", "goibibo", "vacation", 10),
+                KeywordMapping("kw_travel_cleartrip", "cleartrip", "vacation", 10),
+                KeywordMapping("kw_travel_yatra", "yatra", "vacation", 10),
+                KeywordMapping("kw_travel_indigo", "indigo", "vacation", 10),
+                KeywordMapping("kw_travel_airindia", "air india", "vacation", 10),
+                KeywordMapping("kw_travel_spicejet", "spicejet", "vacation", 10),
+                KeywordMapping("kw_travel_flight", "flight booking", "vacation", 8),
 
-            // Hotel & Accommodation
-            KeywordMapping("kw_ho1", "oyo", "hotel", 10),
-            KeywordMapping("kw_ho2", "treebo", "hotel", 10),
-            KeywordMapping("kw_ho3", "airbnb", "hotel", 10),
-            KeywordMapping("kw_ho4", "booking.com", "hotel", 10),
-            KeywordMapping("kw_ho5", "hotel booking", "hotel", 10),
+                // ── Hotel & Accommodation ─────────────────────────────────
+                KeywordMapping("kw_hotel_oyo", "oyo", "hotel", 10),
+                KeywordMapping("kw_hotel_treebo", "treebo", "hotel", 10),
+                KeywordMapping("kw_hotel_airbnb", "airbnb", "hotel", 10),
+                KeywordMapping("kw_hotel_bookingcom", "booking.com", "hotel", 10),
 
-            // Donations & Charity
-            KeywordMapping("kw_dc1", "donation", "donations", 10),
-            KeywordMapping("kw_dc2", "charity", "donations", 10),
-            KeywordMapping("kw_dc3", "ngo", "donations", 8),
+                // ── Donations ─────────────────────────────────────────────
+                KeywordMapping("kw_donation_generic", "donation", "donations", 10),
+                KeywordMapping("kw_donation_charity", "charity", "donations", 10),
+                KeywordMapping("kw_donation_ngo", "ngo", "donations", 8),
 
-            // Gifts
-            KeywordMapping("kw_gi1", "gift", "gifts", 8),
-            KeywordMapping("kw_gi2", "flowers", "gifts", 5),
-            KeywordMapping("kw_gi3", "ferns n petals", "gifts", 10)
-        )
+                // ── Gifts ─────────────────────────────────────────────────
+                KeywordMapping("kw_gifts_generic", "gift", "gifts", 8),
+                KeywordMapping("kw_gifts_fnp", "ferns n petals", "gifts", 10),
+            )
+        }
+
+        /** Convenience accessor sorted by descending priority — ready for matching. */
+        val DEFAULT_KEYWORD_MAPPINGS_SORTED: List<KeywordMapping> by lazy {
+            DEFAULT_KEYWORD_MAPPINGS.sortedByDescending { it.priority }
+        }
     }
 }

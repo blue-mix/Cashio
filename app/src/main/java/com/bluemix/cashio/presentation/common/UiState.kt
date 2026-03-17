@@ -1,7 +1,10 @@
 package com.bluemix.cashio.presentation.common
-
 /**
- * Generic UI state wrapper
+ * Generic wrapper representing async-data lifecycle.
+ *
+ * Every screen observes [UiState] from its ViewModel and
+ * maps each branch to the appropriate UI (loading shimmer,
+ * error card, or content).
  */
 sealed interface UiState<out T> {
     data object Idle : UiState<Nothing>

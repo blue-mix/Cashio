@@ -5,7 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.bluemix.cashio.core.common.Result
 import com.bluemix.cashio.domain.usecase.expense.DeleteExpenseUseCase
 import com.bluemix.cashio.domain.usecase.expense.GetExpenseByIdUseCase
-import com.bluemix.cashio.domain.usecase.expense.GetExpensesUseCase
+import com.bluemix.cashio.domain.usecase.expense.ObserveExpensesUseCase
+import com.bluemix.cashio.domain.usecase.preferences.ObserveSelectedCurrencyUseCase
 import com.bluemix.cashio.presentation.common.UiState
 import com.bluemix.cashio.presentation.transaction.util.filterAndSortTransactions
 import kotlinx.coroutines.Job
@@ -13,13 +14,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * ViewModel managing the Transactions list and details screens.
+ *
+ * All monetary values are in **paise (Long)** within Expense objects.
+ */
 class TransactionViewModel(
-    private val getExpensesUseCase: GetExpensesUseCase,
+    private val observeExpensesUseCase: ObserveExpensesUseCase,
     private val getExpenseByIdUseCase: GetExpenseByIdUseCase,
-    private val deleteExpenseUseCase: DeleteExpenseUseCase
+    private val deleteExpenseUseCase: DeleteExpenseUseCase,
+    private val observeSelectedCurrencyUseCase: ObserveSelectedCurrencyUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TransactionsState())
@@ -28,31 +39,39 @@ class TransactionViewModel(
     private var searchJob: Job? = null
 
     init {
-        loadAll()
+        observeTransactions()
     }
 
     /* ------------------------- Data Loading ------------------------- */
 
-    fun loadAll() = fetchTransactions(showLoading = true)
-
-    fun refresh() {
-        if (state.value.isRefreshing) return
-        fetchTransactions(showLoading = false)
-    }
-
-    private fun fetchTransactions(showLoading: Boolean) {
+    private fun observeTransactions() {
         viewModelScope.launch {
-            updateState {
-                it.copy(
-                    transactionsUi = if (showLoading) UiState.Loading else it.transactionsUi,
-                    isRefreshing = !showLoading,
-                    message = null
-                )
-            }
+            updateState { it.copy(transactionsUi = UiState.Loading) }
 
-            when (val result = getExpensesUseCase()) {
-                is Result.Success -> {
-                    updateState { it.copy(allTransactions = result.data, isRefreshing = false) }
+            combine(
+                observeExpensesUseCase(),
+                observeSelectedCurrencyUseCase()
+            ) { transactions, currency ->
+                transactions to currency
+            }
+                .distinctUntilChanged()
+                .catch { t ->
+                    updateState {
+                        it.copy(
+                            transactionsUi = UiState.Error(
+                                t.message ?: "Failed to load transactions"
+                            ),
+                            isRefreshing = false
+                        )
+                    }
+                }
+                .collectLatest { (transactions, currency) ->
+                    updateState {
+                        it.copy(
+                            allTransactions = transactions,
+                            selectedCurrency = currency
+                        )
+                    }
                     recalculateList()
 
                     // If we have a selection, ensure its details are fresh
@@ -60,21 +79,12 @@ class TransactionViewModel(
                         syncDetailsFromCacheOrFetch(id, preferCache = true)
                     }
                 }
-
-                is Result.Error -> {
-                    updateState {
-                        it.copy(
-                            isRefreshing = false,
-                            transactionsUi = UiState.Error(
-                                result.message ?: "Failed to load transactions"
-                            )
-                        )
-                    }
-                }
-
-                else -> Unit
-            }
         }
+    }
+
+    fun loadAll() {
+        // With reactive flow, this is a no-op or can trigger refresh if needed
+        recalculateList()
     }
 
     /* ------------------------- Filtering & Sorting ------------------------- */
@@ -140,13 +150,7 @@ class TransactionViewModel(
                 is Result.Success -> {
                     val tx = result.data
                     if (tx != null) {
-                        // Update Master List with fresh data if it exists there
-                        updateState { old ->
-                            val updatedList =
-                                old.allTransactions.map { if (it.id == expenseId) tx else it }
-                            old.copy(allTransactions = updatedList, detailsUi = UiState.Success(tx))
-                        }
-                        recalculateList() // Re-apply sort/filter to reflect changes
+                        updateState { it.copy(detailsUi = UiState.Success(tx)) }
                     } else {
                         updateState { it.copy(detailsUi = UiState.Error("Transaction not found")) }
                     }
@@ -177,13 +181,12 @@ class TransactionViewModel(
 
             when (val result = deleteExpenseUseCase(expenseId)) {
                 is Result.Success -> {
-                    // Optimistic update: remove locally immediately
+                    // The reactive flow will automatically update allTransactions,
+                    // but we can set the success flag immediately
                     updateState { old ->
-                        val newAll = old.allTransactions.filterNot { it.id == expenseId }
                         val wasSelected = old.selectedId == expenseId
 
                         old.copy(
-                            allTransactions = newAll,
                             selectedId = if (wasSelected) null else old.selectedId,
                             detailsUi = if (wasSelected) UiState.Idle else old.detailsUi,
                             isDeleting = false,
@@ -191,7 +194,6 @@ class TransactionViewModel(
                             message = "Transaction deleted"
                         )
                     }
-                    recalculateList()
                 }
 
                 is Result.Error -> {

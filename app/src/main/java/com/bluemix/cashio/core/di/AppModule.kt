@@ -9,17 +9,78 @@ import com.bluemix.cashio.presentation.keyword.KeywordMappingViewModel
 import com.bluemix.cashio.presentation.onboarding.OnboardingViewModel
 import com.bluemix.cashio.presentation.settings.vm.SettingsViewModel
 import com.bluemix.cashio.presentation.transaction.TransactionViewModel
-import org.koin.core.module.dsl.viewModelOf
+import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
-    viewModelOf(::DashboardViewModel)
-    viewModelOf(::HistoryViewModel)
-    viewModelOf(::TransactionViewModel)
-    viewModelOf(::AddExpenseViewModel)
-    viewModelOf(::CategoriesViewModel)
-    viewModelOf(::AnalyticsViewModel)
-    viewModelOf(::SettingsViewModel)
-    viewModelOf(::KeywordMappingViewModel)
-    viewModelOf(::OnboardingViewModel)
+
+    viewModel { OnboardingViewModel(get(), get()) }
+    viewModel {
+        SettingsViewModel(
+            observeDarkModeUseCase = get(),
+            setDarkModeUseCase = get(),
+            getKeywordMappingsUseCase = get(),
+            clearAllDataUseCase = get()
+        )
+    }
+
+    viewModel {
+        DashboardViewModel(
+            observeExpensesByDateRangeUseCase = get(),
+            observeSelectedCurrencyUseCase = get(),
+            refreshExpensesFromSmsUseCase = get()
+        )
+    }
+
+    viewModel {
+        AddExpenseViewModel(
+            getCategoriesUseCase = get(),
+            addExpenseUseCase = get(),
+            updateExpenseUseCase = get(),
+            getExpenseByIdUseCase = get()
+        )
+    }
+
+    viewModel {
+        AnalyticsViewModel(
+            getFinancialStatsUseCase = get(),
+            getExpensesByDateRangeUseCase = get(),
+            observeSelectedCurrencyUseCase = get()
+        )
+    }
+
+    viewModel {
+        HistoryViewModel(
+            observeExpensesUseCase = get(),
+            observeSelectedCurrencyUseCase = get()
+        )
+    }
+
+    viewModel {
+        CategoriesViewModel(
+            observeCategoriesUseCase = get(),
+            addCategoryUseCase = get(),
+            updateCategoryUseCase = get(),
+            deleteCategoryUseCase = get()
+        )
+    }
+
+    viewModel {
+        KeywordMappingViewModel(
+            getKeywordMappings = get(),
+            addKeywordMapping = get(),
+            updateKeywordMapping = get(),
+            deleteKeywordMapping = get(),
+            recategorizeExpensesByKeyword = get(),
+            getCategories = get()
+        )
+    }
+    viewModel {
+        TransactionViewModel(
+            observeExpensesUseCase = get(),
+            getExpenseByIdUseCase = get(),
+            deleteExpenseUseCase = get(),
+            observeSelectedCurrencyUseCase = get()
+        )
+    }
 }

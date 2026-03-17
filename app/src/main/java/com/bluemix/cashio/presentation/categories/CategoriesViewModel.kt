@@ -1,127 +1,223 @@
 package com.bluemix.cashio.presentation.categories
 
-import androidx.compose.runtime.Immutable
-import androidx.compose.ui.graphics.Color
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bluemix.cashio.core.common.Result
 import com.bluemix.cashio.domain.model.Category
 import com.bluemix.cashio.domain.usecase.category.AddCategoryUseCase
 import com.bluemix.cashio.domain.usecase.category.DeleteCategoryUseCase
-import com.bluemix.cashio.domain.usecase.category.GetCategoriesUseCase
+import com.bluemix.cashio.domain.usecase.category.ObserveCategoriesUseCase
 import com.bluemix.cashio.domain.usecase.category.UpdateCategoryUseCase
-import com.bluemix.cashio.presentation.common.UiState
+import com.bluemix.cashio.presentation.common.BaseViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 /**
- * Represents the main UI state for the Categories screen.
+ * Editor state for add / edit category dialog.
  *
- * @property categories The current state of the category list (Loading, Success, Error).
- * @property query The current search query for filtering categories.
- * @property editor The state of the add/edit dialog, or null if the editor is closed.
- * @property isDeleting Indicates if a delete operation is currently in progress.
- * @property message A transient message (snackbar) to be displayed to the user.
+ * [colorHex] is a [Long] ARGB value (e.g. 0xFF4CAF50L) — never a
+ * [androidx.compose.ui.graphics.Color]. Conversion happens at the UI layer only.
  */
-@Immutable
-data class CategoriesState(
-    val categories: UiState<List<Category>> = UiState.Idle,
-    val query: String = "",
-    val editor: CategoryEditorState? = null,
-    val isDeleting: Boolean = false,
-    val message: UiMessage? = null
-)
-
-/**
- * Represents the state of the Category Editor (Add/Edit) sheet.
- *
- * @property mode Determines if the editor is creating a new category or updating an existing one.
- * @property categoryId The ID of the category being edited (null if in ADD mode).
- * @property name The current input value for the category name.
- * @property icon The currently selected emoji/icon.
- * @property color The currently selected color.
- * @property fieldError Validation error message for the input fields, if any.
- * @property isSaving Indicates if the save operation is currently in progress.
- */
-@Immutable
 data class CategoryEditorState(
-    val mode: EditorMode,
-    val categoryId: String? = null,
+    val categoryId: String? = null,       // null = add mode
     val name: String = "",
     val icon: String = "📦",
-    val color: Color = Color(0xFF4CAF50),
-    val fieldError: String? = null,
+    val colorHex: Long = 0xFF9E9E9EL,     // Default grey
     val isSaving: Boolean = false
+) {
+    val isEditMode: Boolean get() = categoryId != null
+}
+
+/**
+ * Describes a category deletion that was blocked because the category is in use.
+ * Shown to the user as a confirmation dialog.
+ */
+data class PendingForceDelete(
+    val categoryId: String,
+    val categoryName: String
 )
 
-/**
- * Defines the operational mode of the category editor.
- */
-enum class EditorMode {
-    ADD,
-    EDIT
-}
+data class CategoriesUiState(
+    val categories: List<Category> = emptyList(),
+    val isLoading: Boolean = true,
+    val editor: CategoryEditorState? = null,       // non-null = dialog open
+    val pendingForceDelete: PendingForceDelete? = null,
+    val message: String? = null,
+    val isError: Boolean = false
+)
 
-/**
- * Represents a one-time UI message event.
- */
-@Immutable
-data class UiMessage(val type: UiMessageType, val text: String)
-
-/**
- * Defines the types of feedback messages available.
- */
-enum class UiMessageType {
-    SUCCESS,
-    ERROR
-}
-
-/**
- * ViewModel responsible for managing the Categories screen.
- *
- * Handles fetching, filtering, creating, updating, and deleting categories.
- *
- * @property getCategoriesUseCase Use case to retrieve the list of categories.
- * @property addCategoryUseCase Use case to create a new category.
- * @property updateCategoryUseCase Use case to modify an existing category.
- * @property deleteCategoryUseCase Use case to remove a category.
- */
 class CategoriesViewModel(
-    private val getCategoriesUseCase: GetCategoriesUseCase,
+    private val observeCategoriesUseCase: ObserveCategoriesUseCase,
     private val addCategoryUseCase: AddCategoryUseCase,
     private val updateCategoryUseCase: UpdateCategoryUseCase,
     private val deleteCategoryUseCase: DeleteCategoryUseCase
-) : ViewModel() {
+) : BaseViewModel() {
 
-    private val _state = MutableStateFlow(CategoriesState())
-    val state: StateFlow<CategoriesState> = _state.asStateFlow()
+    private val _uiState = MutableStateFlow(CategoriesUiState())
+    val uiState: StateFlow<CategoriesUiState> = _uiState.asStateFlow()
 
     init {
-        loadCategories()
+        // Reactive — no manual reloads needed after mutations.
+        viewModelScope.launch {
+            observeCategoriesUseCase().collect { categories ->
+                _uiState.update { it.copy(categories = categories, isLoading = false) }
+            }
+        }
     }
 
-    /**
-     * Triggers the loading of categories from the data source.
-     * Updates the UI state to Loading, Success, or Error accordingly.
-     */
-    fun loadCategories() {
+    // ── Dialog open/close ──────────────────────────────────────────────────
+
+    fun openAddCategory() {
+        _uiState.update {
+            it.copy(editor = CategoryEditorState())
+        }
+    }
+
+    fun openEditCategory(category: Category) {
+        _uiState.update {
+            it.copy(
+                editor = CategoryEditorState(
+                    categoryId = category.id,
+                    name = category.name,
+                    icon = category.icon,
+                    colorHex = category.colorHex
+                )
+            )
+        }
+    }
+
+    fun closeEditor() {
+        _uiState.update { it.copy(editor = null) }
+    }
+
+    // ── Editor field updates ───────────────────────────────────────────────
+
+    fun setEditorName(name: String) =
+        _uiState.update { it.copy(editor = it.editor?.copy(name = name)) }
+
+    fun setEditorIcon(icon: String) =
+        _uiState.update { it.copy(editor = it.editor?.copy(icon = icon)) }
+
+    /** [colorHex] must be an ARGB Long (e.g. 0xFF4CAF50L). */
+    fun setEditorColor(colorHex: Long) =
+        _uiState.update { it.copy(editor = it.editor?.copy(colorHex = colorHex)) }
+
+    // ── Save ───────────────────────────────────────────────────────────────
+
+    fun saveCategory() {
+        val editor = _uiState.value.editor ?: return
+        if (editor.isSaving) return
+        if (editor.name.isBlank()) {
+            _uiState.update { it.copy(message = "Category name is required", isError = true) }
+            return
+        }
+
+        _uiState.update { it.copy(editor = it.editor?.copy(isSaving = true)) }
+
         viewModelScope.launch {
-            if (state.value.categories !is UiState.Success) {
-                updateState { it.copy(categories = UiState.Loading) }
+            val category = if (editor.isEditMode) {
+                // EDIT: look up the live category to preserve fields not in the editor.
+                val existing = _uiState.value.categories.find { it.id == editor.categoryId }
+                if (existing == null) {
+                    // Category was deleted while editor was open — clean up and bail.
+                    _uiState.update {
+                        it.copy(
+                            editor = null,
+                            message = "Category no longer exists",
+                            isError = true
+                        )
+                    }
+                    return@launch
+                }
+                existing.copy(
+                    name = editor.name.trim(),
+                    icon = editor.icon,
+                    colorHex = editor.colorHex
+                )
+            } else {
+                // ADD: generate a stable slug ID from the name.
+                Category(
+                    id = generateCategoryId(editor.name),
+                    name = editor.name.trim(),
+                    icon = editor.icon,
+                    colorHex = editor.colorHex,
+                    isDefault = false
+                )
             }
 
-            when (val result = getCategoriesUseCase()) {
-                is Result.Success -> updateState { it.copy(categories = UiState.Success(result.data)) }
-                is Result.Error -> updateState {
-                    it.copy(
-                        categories = UiState.Error(
-                            result.message ?: "Failed to load categories"
+            val result = if (editor.isEditMode) {
+                updateCategoryUseCase(category)
+            } else {
+                addCategoryUseCase(category)
+            }
+
+            when (result) {
+                is Result.Success -> {
+                    // Reactive flow already updates the list — just close the dialog.
+                    _uiState.update {
+                        it.copy(
+                            editor = null,
+                            message = if (editor.isEditMode) "Category updated" else "Category added",
+                            isError = false
                         )
-                    )
+                    }
+                }
+
+                is Result.Error -> {
+                    // Always reset isSaving on error so the user can retry.
+                    _uiState.update {
+                        it.copy(
+                            editor = it.editor?.copy(isSaving = false),
+                            message = result.message,
+                            isError = true
+                        )
+                    }
+                }
+
+                else -> _uiState.update { it.copy(editor = it.editor?.copy(isSaving = false)) }
+            }
+        }
+    }
+
+    // ── Delete ─────────────────────────────────────────────────────────────
+
+    /**
+     * Attempts to delete [category]. If the category is in use, sets
+     * [CategoriesUiState.pendingForceDelete] so the UI can show a confirmation
+     * dialog offering the user two options: reassign-and-delete or cancel.
+     *
+     * This closes the UX dead-end where an error was shown but no action offered.
+     */
+    fun deleteCategory(category: Category) {
+        viewModelScope.launch {
+            when (val result = deleteCategoryUseCase(DeleteCategoryUseCase.Params(category.id))) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            editor = null,
+                            message = "${category.name} deleted",
+                            isError = false
+                        )
+                    }
+                }
+
+                is Result.Error -> {
+                    val ex = result.exception
+                    if (ex is IllegalStateException && ex.message?.contains("in use") == true) {
+                        // Category is in use — surface confirmation dialog.
+                        _uiState.update {
+                            it.copy(
+                                pendingForceDelete = PendingForceDelete(
+                                    category.id,
+                                    category.name
+                                )
+                            )
+                        }
+                    } else {
+                        _uiState.update { it.copy(message = result.message, isError = true) }
+                    }
                 }
 
                 else -> Unit
@@ -130,176 +226,45 @@ class CategoriesViewModel(
     }
 
     /**
-     * Updates the search query used to filter the category list.
-     *
-     * @param value The new search string.
+     * User confirmed force-delete: reassigns all expenses to "other" then deletes.
      */
-    fun setQuery(value: String) = updateState { it.copy(query = value) }
-
-    /**
-     * Opens the category editor in [EditorMode.ADD] mode with default values.
-     */
-    fun openAddCategory() {
-        updateState {
-            it.copy(
-                editor = CategoryEditorState(
-                    mode = EditorMode.ADD,
-                    name = "",
-                    icon = "📦",
-                    color = Color(0xFF4CAF50)
-                )
-            )
-        }
-    }
-
-    /**
-     * Opens the category editor in [EditorMode.EDIT] mode, pre-filled with the provided category data.
-     *
-     * @param category The category to be edited.
-     */
-    fun openEditCategory(category: Category) {
-        updateState {
-            it.copy(
-                editor = CategoryEditorState(
-                    mode = EditorMode.EDIT,
-                    categoryId = category.id,
-                    name = category.name,
-                    icon = category.icon,
-                    color = category.color
-                )
-            )
-        }
-    }
-
-    /**
-     * Updates the name field in the active editor.
-     */
-    fun updateEditorName(value: String) = updateEditor { it.copy(name = value, fieldError = null) }
-
-    /**
-     * Updates the icon field in the active editor.
-     */
-    fun updateEditorIcon(value: String) = updateEditor { it.copy(icon = value) }
-
-    /**
-     * Updates the color field in the active editor.
-     */
-    fun updateEditorColor(value: Color) = updateEditor { it.copy(color = value) }
-
-    /**
-     * Closes the editor without saving changes.
-     */
-    fun dismissEditor() = updateState { it.copy(editor = null) }
-
-    /**
-     * Validates the input and saves the category.
-     *
-     * - If in [EditorMode.ADD], creates a new category.
-     * - If in [EditorMode.EDIT], updates the existing category.
-     * - If validation fails, sets a field error in the editor state.
-     */
-    fun saveCategory() {
-        val editor = state.value.editor ?: return
-        if (editor.isSaving) return
-
-        val name = editor.name.trim()
-        if (name.isBlank()) {
-            updateEditor { it.copy(fieldError = "Category name is required") }
-            return
-        }
+    fun confirmForceDelete() {
+        val pending = _uiState.value.pendingForceDelete ?: return
+        _uiState.update { it.copy(pendingForceDelete = null) }
 
         viewModelScope.launch {
-            updateEditor { it.copy(isSaving = true, fieldError = null) }
-
-            val category = if (editor.mode == EditorMode.ADD) {
-                Category(
-                    id = "cat_${UUID.randomUUID()}",
-                    name = name,
-                    icon = editor.icon,
-                    color = editor.color,
-                    isDefault = false
-                )
-            } else {
-                val existingList = (state.value.categories as? UiState.Success)?.data
-                val existing = existingList?.find { it.id == editor.categoryId }
-
-                existing?.copy(name = name, icon = editor.icon, color = editor.color)
-                    ?: return@launch showMessage(UiMessageType.ERROR, "Category not found")
-            }
-
-            val result = if (editor.mode == EditorMode.ADD) {
-                addCategoryUseCase(category)
-            } else {
-                updateCategoryUseCase(category)
-            }
-
-            when (result) {
-                is Result.Success -> {
-                    updateState { it.copy(editor = null) }
-                    showMessage(
-                        UiMessageType.SUCCESS,
-                        if (editor.mode == EditorMode.ADD) "Category added" else "Category updated"
-                    )
-                    loadCategories()
+            when (val result = deleteCategoryUseCase(
+                DeleteCategoryUseCase.Params(pending.categoryId, forceDelete = true)
+            )) {
+                is Result.Success -> _uiState.update {
+                    it.copy(message = "${pending.categoryName} deleted", isError = false)
                 }
 
-                is Result.Error -> {
-                    updateEditor { it.copy(isSaving = false) }
-                    showMessage(UiMessageType.ERROR, result.message ?: "Failed to save category")
+                is Result.Error -> _uiState.update {
+                    it.copy(message = result.message, isError = true)
                 }
 
-                else -> updateEditor { it.copy(isSaving = false) }
+                else -> Unit
             }
         }
     }
+
+    fun dismissForceDeleteDialog() {
+        _uiState.update { it.copy(pendingForceDelete = null) }
+    }
+
+    fun dismissMessage() = _uiState.update { it.copy(message = null, isError = false) }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
 
     /**
-     * Deletes a category by its ID.
-     *
-     * @param categoryId The unique identifier of the category to delete.
-     * @param forceDelete If true, deletes the category even if it has associated expenses.
+     * Generates a stable lowercase slug from [name] for use as the category ID.
+     * Duplicate IDs are handled by [AddCategoryUseCase] returning [Result.Error].
      */
-    fun deleteCategory(categoryId: String, forceDelete: Boolean = false) {
-        if (state.value.isDeleting) return
-
-        viewModelScope.launch {
-            updateState { it.copy(isDeleting = true) }
-
-            val params = DeleteCategoryUseCase.Params(categoryId, forceDelete)
-            when (val result = deleteCategoryUseCase(params)) {
-                is Result.Success -> {
-                    updateState { it.copy(isDeleting = false) }
-                    showMessage(UiMessageType.SUCCESS, "Category deleted")
-                    loadCategories()
-                }
-
-                is Result.Error -> {
-                    updateState { it.copy(isDeleting = false) }
-                    showMessage(UiMessageType.ERROR, result.message ?: "Failed to delete category")
-                }
-
-                else -> updateState { it.copy(isDeleting = false) }
-            }
-        }
-    }
-
-    /**
-     * Clears the current UI message (snackbar).
-     */
-    fun clearMessage() = updateState { it.copy(message = null) }
-
-    private fun showMessage(type: UiMessageType, text: String) {
-        updateState { it.copy(message = UiMessage(type, text)) }
-    }
-
-    private fun updateState(transform: (CategoriesState) -> CategoriesState) {
-        _state.update(transform)
-    }
-
-    private fun updateEditor(transform: (CategoryEditorState) -> CategoryEditorState) {
-        updateState { s ->
-            val editor = s.editor ?: return@updateState s
-            s.copy(editor = transform(editor))
-        }
-    }
+    private fun generateCategoryId(name: String): String =
+        name.trim()
+            .lowercase()
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .take(40)
+            .trimEnd('_')
 }

@@ -10,34 +10,18 @@ import kotlinx.serialization.Serializable
  * by Kotlinx Serialization.
  */
 sealed interface Route {
-
-    // --- Startup Flow ---
-
-    /**
-     * The initial onboarding screen for new users.
-     */
     @Serializable
     data object Onboarding : Route
-
-    // --- Main Bottom Navigation Tabs ---
-
     @Serializable
     data object Dashboard : Route
-
     @Serializable
     data object Transactions : Route
-
     @Serializable
     data object History : Route
-
     @Serializable
     data object Analytics : Route
-
     @Serializable
     data object Settings : Route
-
-    // --- Feature Screens ---
-
     /**
      * Screen for adding or editing an expense.
      * @param expenseId If null, creates a new expense. If provided, edits the existing one.
@@ -51,9 +35,6 @@ sealed interface Route {
      */
     @Serializable
     data class TransactionDetails(val transactionId: String) : Route
-
-    // --- Settings Sub-screens ---
-
     @Serializable
     data object Categories : Route
 

@@ -1,40 +1,26 @@
-//package com.bluemix.cashio.domain.model
-//
-///**
-// * Type of financial transaction
-// */
-//enum class TransactionType {
-//    INCOME,
-//    EXPENSE;
-//
-//    companion object {
-//        fun fromString(value: String): TransactionType {
-//            return when (value.uppercase()) {
-//                "INCOME" -> INCOME
-//                "EXPENSE" -> EXPENSE
-//                else -> EXPENSE
-//            }
-//        }
-//    }
-//}
 package com.bluemix.cashio.domain.model
 
-import com.bluemix.cashio.domain.model.TransactionType.valueOf
-
-
 /**
- * Type of financial transaction
+ * Direction of a financial transaction.
  */
 enum class TransactionType {
     INCOME,
     EXPENSE;
 
     companion object {
+        /**
+         * Returns the [TransactionType] for [value] (case-insensitive),
+         * or [EXPENSE] as a safe fallback if the value is unrecognised.
+         *
+         * Only [IllegalArgumentException] from [valueOf] is caught — other
+         * exceptions are allowed to propagate so genuine programming errors
+         * are not silently swallowed.
+         */
         fun fromString(value: String): TransactionType {
             return try {
                 valueOf(value.uppercase())
-            } catch (e: Exception) {
-                EXPENSE // Fallback safe default
+            } catch (e: IllegalArgumentException) {
+                EXPENSE
             }
         }
     }

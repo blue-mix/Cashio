@@ -28,13 +28,18 @@ android {
             val keyAlias = System.getenv("CASHIO_KEY_ALIAS")
             val keyPwd = System.getenv("CASHIO_KEY_PASSWORD")
 
-            if (!keystorePath.isNullOrEmpty() && !storePwd.isNullOrEmpty() && !keyAlias.isNullOrEmpty() && !keyPwd.isNullOrEmpty()) {
+            if (!keystorePath.isNullOrBlank() &&
+                !storePwd.isNullOrBlank() &&
+                !keyAlias.isNullOrBlank() &&
+                !keyPwd.isNullOrBlank()
+            ) {
                 storeFile = file(keystorePath)
                 storePassword = storePwd
                 this.keyAlias = keyAlias
                 keyPassword = keyPwd
             } else {
-                println("⚠️ Release signing keys not found in Env Vars. Skipping signing config.")
+                // For CI release builds, you may want to FAIL instead of warn.
+                println("⚠️ Release signing env vars missing: building unsigned release.")
             }
         }
     }
@@ -50,6 +55,7 @@ android {
                 "proguard-rules.pro"
             )
 
+            // Only apply signing when present.
             if (signingConfigs.getByName("release").storeFile != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -65,7 +71,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -81,15 +86,21 @@ android {
         buildConfig = true
     }
 
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
+    }
+
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += setOf(
+                "/META-INF/{AL2.0,LGPL2.1}"
+            )
         }
     }
 }
 
 dependencies {
-    // --- Core ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -97,43 +108,32 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
 
-    // --- Compose ---
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    // Extended Icons (Required for Category icons)
     implementation(libs.androidx.compose.material.icons.extended)
 
-    // --- Navigation ---
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
 
-    // --- DataStore ---
     implementation(libs.androidx.datastore.preferences)
 
-    // --- Coroutines ---
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // --- Database (Realm) ---
     implementation(libs.realm.kotlin)
 
-    // --- DI (Koin) ---
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
     implementation(libs.koin.compose.viewmodel)
 
-    // --- UI Libs ---
     implementation(libs.ehsannarmani.compose.charts)
-    implementation("com.kizitonwose.calendar:compose:2.6.0")
+    implementation(libs.kizitonwose.calendar.compose)
 
-    // --- Desugaring ---
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
-    // --- Testing ---
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -146,4 +146,5 @@ dependencies {
 
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation(libs.androidx.work.runtime.ktx)
 }

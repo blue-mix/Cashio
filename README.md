@@ -21,7 +21,7 @@
 
 ---
 
-## 💸 Smart Expense & Income Tracker for Android
+## 💸 Smart Expense & Income Tracker for Android     
 
 Cashio is a **production-grade personal finance app** built with **Jetpack Compose** and **clean
 architecture principles**.

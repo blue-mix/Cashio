@@ -1,157 +1,7 @@
-//package com.bluemix.cashio.data.repository
-//
-//import com.bluemix.cashio.core.common.Result
-//import com.bluemix.cashio.core.common.resultOf
-//import com.bluemix.cashio.data.local.database.RealmManager
-//import com.bluemix.cashio.data.local.entity.KeywordMappingEntity
-//import com.bluemix.cashio.data.local.mapper.toDomain
-//import com.bluemix.cashio.data.local.mapper.toEntity
-//import com.bluemix.cashio.domain.model.KeywordMapping
-//import com.bluemix.cashio.domain.repository.KeywordMappingRepository
-//import io.realm.kotlin.ext.query
-//import io.realm.kotlin.notifications.ResultsChange
-//import io.realm.kotlin.query.Sort
-//import kotlinx.coroutines.Dispatchers
-//import kotlinx.coroutines.flow.Flow
-//import kotlinx.coroutines.flow.map
-//import kotlinx.coroutines.withContext
-//import java.util.Locale
-//
-///**
-// * Implementation of KeywordMappingRepository using Realm
-// */
-//class KeywordMappingRepositoryImpl(
-//    private val realmManager: RealmManager
-//) : KeywordMappingRepository {
-//
-//    private val realm get() = realmManager.realm
-//
-//    override fun observeKeywordMappings(): Flow<List<KeywordMapping>> {
-//        return realm.query<KeywordMappingEntity>()
-//            .sort("priority", Sort.DESCENDING)
-//            .asFlow()
-//            .map { resultsChange: ResultsChange<KeywordMappingEntity> ->
-//                resultsChange.list.map { it.toDomain() }
-//            }
-//    }
-//
-//    override suspend fun getAllKeywordMappings(): Result<List<KeywordMapping>> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                realm.query<KeywordMappingEntity>()
-//                    .sort("priority", Sort.DESCENDING)
-//                    .find()
-//                    .map { it.toDomain() }
-//            }
-//        }
-//
-//    override suspend fun getKeywordMappingById(id: String): Result<KeywordMapping?> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                realm.query<KeywordMappingEntity>("id == $0", id)
-//                    .first()
-//                    .find()
-//                    ?.toDomain()
-//            }
-//        }
-//
-//    override suspend fun getKeywordMappingsByCategory(categoryId: String): Result<List<KeywordMapping>> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                realm.query<KeywordMappingEntity>("categoryId == $0", categoryId)
-//                    .sort("priority", Sort.DESCENDING)
-//                    .find()
-//                    .map { it.toDomain() }
-//            }
-//        }
-//
-//    override suspend fun findCategoryForMerchant(merchantName: String): Result<String?> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                if (merchantName.isBlank()) return@resultOf null
-//
-//                val lowerMerchant = merchantName.lowercase(Locale.getDefault())
-//
-//                // Get all keyword mappings sorted by priority
-//                val mappings = realm.query<KeywordMappingEntity>()
-//                    .sort("priority", Sort.DESCENDING)
-//                    .find()
-//
-//                // Find first matching keyword
-//                for (mapping in mappings) {
-//                    val keyword = mapping.keyword.lowercase(Locale.getDefault())
-//                    if (keyword in lowerMerchant) {
-//                        return@resultOf mapping.categoryId
-//                    }
-//                }
-//
-//                null  // No match found
-//            }
-//        }
-//
-//    override suspend fun addKeywordMapping(mapping: KeywordMapping): Result<Unit> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                realm.write {
-//                    val entity = mapping.toEntity()
-//                    copyToRealm(entity)
-//                }
-//                    .let { }
-//            }
-//
-//        }
-//
-//    override suspend fun updateKeywordMapping(mapping: KeywordMapping): Result<Unit> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                realm.write {
-//                    val existingEntity = query<KeywordMappingEntity>("id == $0", mapping.id)
-//                        .first()
-//                        .find()
-//
-//                    if (existingEntity != null) {
-//                        existingEntity.apply {
-//                            keyword = mapping.keyword
-//                            categoryId = mapping.categoryId
-//                            priority = mapping.priority
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//
-//    override suspend fun deleteKeywordMapping(mappingId: String): Result<Unit> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                realm.write {
-//                    val entity = query<KeywordMappingEntity>("id == $0", mappingId)
-//                        .first()
-//                        .find()
-//
-//                    if (entity != null) {
-//                        delete(entity)
-//                    }
-//                }
-//            }
-//        }
-//
-//    override suspend fun deleteKeywordMappingsByCategory(categoryId: String): Result<Unit> =
-//        withContext(Dispatchers.IO) {
-//            resultOf {
-//                realm.write {
-//                    val entities = query<KeywordMappingEntity>("categoryId == $0", categoryId)
-//                        .find()
-//
-//                    delete(entities)
-//                }
-//            }
-//        }
-//}
 package com.bluemix.cashio.data.repository
 
 import com.bluemix.cashio.core.common.Result
 import com.bluemix.cashio.core.common.resultOf
-import com.bluemix.cashio.data.local.database.DatabaseSeeder
 import com.bluemix.cashio.data.local.database.RealmManager
 import com.bluemix.cashio.data.local.entity.KeywordMappingEntity
 import com.bluemix.cashio.data.local.mapper.toDomain
@@ -160,10 +10,9 @@ import com.bluemix.cashio.domain.model.KeywordMapping
 import com.bluemix.cashio.domain.repository.KeywordMappingRepository
 import io.realm.kotlin.ext.query
 import io.realm.kotlin.query.Sort
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class KeywordMappingRepositoryImpl(
     private val realmManager: RealmManager
@@ -171,106 +20,94 @@ class KeywordMappingRepositoryImpl(
 
     private val realm get() = realmManager.realm
 
-    override suspend fun seedDefaults(): Result<Boolean> = withContext(Dispatchers.IO) {
-        resultOf {
-            // Uses your DatabaseSeeder object
-            DatabaseSeeder.seedDefaultKeywordMappings(realmManager.realm)
-        }
-    }
+    // ── Reactive observation ───────────────────────────────────────────────
 
-    override fun observeKeywordMappings(): Flow<List<KeywordMapping>> {
-        return realm.query<KeywordMappingEntity>()
+    override fun observeKeywordMappings(): Flow<List<KeywordMapping>> =
+        realm.query<KeywordMappingEntity>()
             .sort("priority", Sort.DESCENDING)
             .asFlow()
             .map { changes -> changes.list.map { it.toDomain() } }
+
+    // ── One-shot queries ───────────────────────────────────────────────────
+
+    override suspend fun getAllKeywordMappings(): Result<List<KeywordMapping>> = resultOf {
+        realm.query<KeywordMappingEntity>()
+            .sort("priority", Sort.DESCENDING)
+            .find()
+            .map { it.toDomain() }
     }
 
-    override suspend fun getAllKeywordMappings(): Result<List<KeywordMapping>> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                realm.query<KeywordMappingEntity>()
-                    .sort("priority", Sort.DESCENDING)
-                    .find()
-                    .map { it.toDomain() }
-            }
-        }
-
-    override suspend fun getKeywordMappingById(id: String): Result<KeywordMapping?> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                realm.query<KeywordMappingEntity>("id == $0", id).first().find()?.toDomain()
-            }
-        }
+    override suspend fun getKeywordMappingById(id: String): Result<KeywordMapping?> = resultOf {
+        realm.query<KeywordMappingEntity>("id == $0", id).first().find()?.toDomain()
+    }
 
     override suspend fun getKeywordMappingsByCategory(categoryId: String): Result<List<KeywordMapping>> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                realm.query<KeywordMappingEntity>("categoryId == $0", categoryId)
-                    .sort("priority", Sort.DESCENDING)
-                    .find()
-                    .map { it.toDomain() }
-            }
+        resultOf {
+            realm.query<KeywordMappingEntity>("categoryId == $0", categoryId)
+                .sort("priority", Sort.DESCENDING)
+                .find()
+                .map { it.toDomain() }
         }
 
-    override suspend fun findCategoryForMerchant(merchantName: String): Result<String?> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                if (merchantName.isBlank()) return@resultOf null
+    /**
+     * Finds the best-matching category ID for [merchantName] using substring matching.
+     *
+     * Matching is case-insensitive containment: the keyword must appear somewhere in
+     * the merchant name string. Short or ambiguous keywords (e.g. "vi", "water")
+     * can produce false positives — keep default keywords specific (see [KeywordMapping.DEFAULT_KEYWORD_MAPPINGS]).
+     *
+     * Returns `null` if no rule matches, indicating the caller should use a fallback
+     * category (typically "other").
+     *
+     * NOTE: This loads all mappings into memory on every call. For bulk SMS import,
+     * load mappings once in the caller ([ExpenseRepositoryImpl.refreshExpensesFromSms])
+     * and perform matching there rather than calling this method per transaction.
+     */
+    override suspend fun findCategoryForMerchant(merchantName: String): Result<String?> = resultOf {
+        val normalized = merchantName.trim().lowercase(Locale.getDefault())
+        if (normalized.isBlank()) return@resultOf null
 
-                // Optimization: Fetch once, filter in memory
-                val mappings = realm.query<KeywordMappingEntity>()
-                    .sort("priority", Sort.DESCENDING)
-                    .find()
+        realm.query<KeywordMappingEntity>()
+            .sort("priority", Sort.DESCENDING)
+            .find()
+            .firstOrNull { mapping ->
+                val kw = mapping.keyword.trim().lowercase(Locale.getDefault())
+                kw.isNotBlank() && kw in normalized
+            }
+            ?.categoryId
+    }
 
-                val lowerMerchant = merchantName.lowercase()
-                val match = mappings.firstOrNull { it.keyword.lowercase() in lowerMerchant }
+    // ── Mutations ──────────────────────────────────────────────────────────
 
-                match?.categoryId
+    override suspend fun addKeywordMapping(mapping: KeywordMapping): Result<Unit> = resultOf {
+        realm.write { copyToRealm(mapping.toEntity()) }
+        Unit
+    }
+
+    override suspend fun updateKeywordMapping(mapping: KeywordMapping): Result<Unit> = resultOf {
+        realm.write {
+            val existing = query<KeywordMappingEntity>("id == $0", mapping.id).first().find()
+                ?: return@write   // Nothing to update
+            existing.apply {
+                keyword = mapping.keyword
+                categoryId = mapping.categoryId
+                priority = mapping.priority
             }
         }
+    }
 
-    override suspend fun addKeywordMapping(mapping: KeywordMapping): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                realm.write { copyToRealm(mapping.toEntity()) }
-                Unit
-            }
+    override suspend fun deleteKeywordMapping(mappingId: String): Result<Unit> = resultOf {
+        realm.write {
+            val entity = query<KeywordMappingEntity>("id == $0", mappingId).first().find()
+            if (entity != null) delete(entity)
         }
-
-    override suspend fun updateKeywordMapping(mapping: KeywordMapping): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                realm.write {
-                    val existing =
-                        query<KeywordMappingEntity>("id == $0", mapping.id).first().find()
-                    existing?.apply {
-                        keyword = mapping.keyword
-                        categoryId = mapping.categoryId
-                        priority = mapping.priority
-                    }
-                }
-                Unit
-            }
-        }
-
-    override suspend fun deleteKeywordMapping(mappingId: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                realm.write {
-                    val entity = query<KeywordMappingEntity>("id == $0", mappingId).first().find()
-                    if (entity != null) delete(entity)
-                }
-            }
-        }
+    }
 
     override suspend fun deleteKeywordMappingsByCategory(categoryId: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            resultOf {
-                realm.write {
-                    val entities =
-                        query<KeywordMappingEntity>("categoryId == $0", categoryId).find()
-                    delete(entities)
-                }
+        resultOf {
+            realm.write {
+                val entities = query<KeywordMappingEntity>("categoryId == $0", categoryId).find()
+                delete(entities)
             }
         }
 }
