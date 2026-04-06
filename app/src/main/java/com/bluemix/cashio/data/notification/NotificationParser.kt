@@ -1,5 +1,6 @@
 package com.bluemix.cashio.data.notification
 
+import com.bluemix.cashio.domain.model.Money
 import com.bluemix.cashio.domain.model.ParsedNotificationTransaction
 import com.bluemix.cashio.domain.model.TransactionType
 import java.time.LocalDateTime
@@ -117,7 +118,7 @@ object NotificationParser {
         val raw = match.groupValues[1].replace(",", "")
         val value = raw.toDoubleOrNull() ?: return null
         if (value <= 0.0) return null
-        return (value * 100).toLong()
+        return Money.toPaise(value)
     }
 
     /**

@@ -7,6 +7,7 @@ import com.bluemix.cashio.domain.model.Category
 import com.bluemix.cashio.domain.model.Expense
 import com.bluemix.cashio.domain.model.ExpenseSource
 import com.bluemix.cashio.domain.model.TransactionType
+import com.bluemix.cashio.domain.model.Money
 import com.bluemix.cashio.domain.usecase.category.GetCategoriesUseCase
 import com.bluemix.cashio.domain.usecase.expense.AddExpenseUseCase
 import com.bluemix.cashio.domain.usecase.expense.GetExpenseByIdUseCase
@@ -186,8 +187,7 @@ class AddExpenseViewModel(
         viewModelScope.launch {
             updateState { it.copy(isSaving = true, errorMessage = null) }
 
-            // ✅ FIX: Convert Double → Long (paise)
-            val amountPaise = (amountDouble * 100).toLong()
+            val amountPaise = Money.toPaise(amountDouble)
 
             val expense = Expense(
                 id = current.editingExpenseId ?: "exp_${UUID.randomUUID()}",

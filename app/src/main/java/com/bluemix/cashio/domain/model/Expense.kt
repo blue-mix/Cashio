@@ -44,7 +44,7 @@ data class Expense(
 
     companion object {
         /** Convert a user-entered [Double] to paise, rounding half-up. */
-        fun paise(amount: Double): Long = (amount * 100).toLong()
+        fun paise(amount: Double): Long = Money.toPaise(amount)
     }
 }
 
