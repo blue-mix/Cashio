@@ -1,6 +1,7 @@
 package com.bluemix.cashio.data.sms
 
 import com.bluemix.cashio.data.sms.SmsParser.BANK_PATTERNS
+import com.bluemix.cashio.domain.model.Money
 import com.bluemix.cashio.domain.model.ParsedSmsTransaction
 import com.bluemix.cashio.domain.model.TransactionType
 import java.security.MessageDigest
@@ -128,7 +129,7 @@ object SmsParser {
     internal fun parseAmountToPaise(raw: String): Long? {
         val value = raw.replace(",", "").toDoubleOrNull() ?: return null
         if (value <= 0.0) return null
-        return (value * 100).toLong()
+        return Money.toPaise(value)
     }
 
     // ── Bank patterns ──────────────────────────────────────────────────────

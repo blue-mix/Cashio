@@ -3,6 +3,7 @@ package com.bluemix.cashio.core.format
 import com.bluemix.cashio.core.format.CashioFormat.compactAmount
 import com.bluemix.cashio.core.format.CashioFormat.money
 import com.bluemix.cashio.domain.model.Currency
+import com.bluemix.cashio.domain.model.Money
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -137,7 +138,7 @@ object CashioFormat {
      * Use [money] for stored paise values wherever possible.
      */
     fun moneyFromDouble(amount: Double, currency: Currency = Currency.INR): String =
-        money((amount * 100).toLong(), currency)
+        money(Money.toPaise(amount), currency)
 
     /**
      * Returns a percentage string, e.g. 0.456 → "45.6%"
